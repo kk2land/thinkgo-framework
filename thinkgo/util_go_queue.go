@@ -1,0 +1,89 @@
+package thinkgo
+
+import (
+	"sync"
+	"sync/atomic"
+)
+
+// 将一些不重要需要上锁的操作改成使用go + channel的方式
+
+type GoQueue struct {
+	ch      chan interface{}
+	state   int32
+	wait    *sync.WaitGroup
+	handler func(obj interface{})
+}
+
+func NewGoQueue(size int, handler func(obj interface{})) *GoQueue {
+	//wait := &sync.WaitGroup{}
+	//wait.Add(1)
+	return &GoQueue{
+		ch:    make(chan interface{}, size),
+		state: 0,
+		//wait:    wait,
+		handler: handler,
+	}
+}
+
+func (g *GoQueue) Start() {
+	if !atomic.CompareAndSwapInt32(&g.state, 0, 1) {
+		//already flushStart or close
+		return
+	}
+	go func() {
+	loop:
+		for {
+			select {
+			case obj := <-g.ch:
+				if obj == nil {
+					break loop
+				}
+				g.goHandle(obj)
+			}
+		}
+		if g.wait != nil {
+			g.wait.Done()
+		}
+	}()
+}
+
+func (g *GoQueue) Send(obj interface{}) {
+	if atomic.LoadInt32(&g.state) != 2 {
+		defer func() {
+			_ = recover()
+		}()
+		g.ch <- obj
+	}
+}
+
+func (g *GoQueue) Close() {
+	if atomic.CompareAndSwapInt32(&g.state, 1, 2) {
+		close(g.ch)
+	}
+}
+
+func (g *GoQueue) CloseAndWait(wait *sync.WaitGroup) {
+	if atomic.CompareAndSwapInt32(&g.state, 1, 2) {
+		if wait != nil {
+			wait.Add(1)
+			g.wait = wait
+		}
+		close(g.ch)
+	}
+}
+
+//func (g *GoQueue) CloseAndWait() {
+//	if atomic.CompareAndSwapInt32(&g.state, 1, 2) {
+//		close(g.done)
+//		g.wait.Wait()
+//	}
+//}
+
+func (g *GoQueue) goHandle(obj interface{}) {
+	defer func() {
+		if err := recover(); err != nil {
+			Logger.Errorf("[GoQueue] goHandle fail - %s", err)
+		}
+	}()
+	g.handler(obj)
+}

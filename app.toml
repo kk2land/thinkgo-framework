@@ -1,0 +1,47 @@
+# 支持宏： {{ModuleName}}、{{AppPath}}、{{AppStatus}}、{{CommandName}}
+# 支持环境变量宏： {{...}}读取环境变量
+
+app_name = "应用名"      # 应用名，不能为空
+app_debug = false       # 是否是调试模式
+ops_alarm = ""          # 告警的对象
+
+[cmd_logNames]          # 指定command使用不同的日志文件
+
+[http]
+port = 8082             # http服务端口，如果是0，则将随机端口
+withGrpc = false        # 是否开启grpc
+rootPath = ""           # http请求path的前缀路径，默认空字符串
+readTimeout = "xxs"     # 读取超时时间，单位支持："ms", "s", "m", "h"
+writeTimeout = "xxs"    # 写入超时时间
+idleTimeout = "xxs"     # http开启KeepAlive时，连接等待下个请求请求超过该值，则关闭连接
+maxHeaderBytes = 0      # http请求头的最大字节数
+
+[grpc]
+authenticationEnable = false    # 是否开启默认的权限校验
+authenticationKey = "..."       # 默认权限校验的key
+
+[redis]
+[redis.default]         # 必须有个default的配置
+addr = "address:port"   # redis的地址
+db = 0                  # redis连接的database
+password = ""           # redis的密码
+prefix = ""             # redis操作的key的前缀
+timeout = 10            # redis操作的超时时间，单位秒
+poolSize = 10           # redis连接池大小，Default is 10 * runtime.GOMAXPROCS.
+maxRetries = 0          # 操作重试次数，Default is 3 retries; -1 disables retries.
+minRetryBackoff = 0     # 重试时，延迟最小毫秒重试，Default is 8 milliseconds; -1 disables backoff.
+maxRetryBackoff = 0     # 重试时，延迟最大毫秒重试，Default is 512 milliseconds; -1 disables backoff.
+
+[redis.default.cmd_options.http]    # 对特定的command，配置不同的参数timeout/poolSize/maxRetries/...
+
+[database]
+[database.default]          # 必须有个default的配置
+driverName = "mysql"        # driver
+driverSourceName = "{user}:{password}@tcp(address:{port})/{database}?charset=utf8mb4"
+connMaxLifetime = "xxs"     # maximum amount of time a connection may be reused. <0则不会关闭
+connMaxIdleTime = "xxs"     # the maximum amount of time a connection may be idle. <0则不会管理
+maxOpenConns = 0           # 连接池大小
+
+[database.default.cmd_maxOpenConns]     # 对特定的command，配置不同的连接池大小
+
+[custom]        # 自定义的配置
