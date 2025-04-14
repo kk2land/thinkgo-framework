@@ -243,7 +243,7 @@ func CallShutdownHooks() {
 func StartHttpServer(
 	port int,
 	handler http.Handler,
-	options func(*http.Server),
+	options func(server *http.Server, registerSignalHook func(prePost int, sig os.Signal, f func()) error),
 ) {
 	defer func() {
 		DBCloseAll()
@@ -255,7 +255,7 @@ func StartHttpServer(
 	addr := fmt.Sprintf(":%d", port)
 	server := endless.NewServer(addr, handler)
 	//配置server
-	options(&server.Server)
+	options(&server.Server, server.RegisterSignalHook)
 	//对于随机端口，获取port
 	server.BeforeBegin = func(add string) {
 		if port == 0 {
