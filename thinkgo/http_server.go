@@ -144,7 +144,7 @@ func HttpStartServer() {
 	StartHttpServer(
 		port,
 		h2c.NewHandler(handler, &http2.Server{}),
-		func(server *http.Server) {
+		func(server *http.Server, registerSignalHook RegisterSignalHook) {
 			if Config.Http.ReadTimeout != 0 {
 				server.ReadTimeout = Config.Http.ReadTimeout.ToDuration()
 			}
