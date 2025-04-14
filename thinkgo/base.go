@@ -240,10 +240,12 @@ func CallShutdownHooks() {
 	Logger.Infof("CallShutdownHooks finished")
 }
 
+type RegisterSignalHook func(prePost int, sig os.Signal, f func()) error
+
 func StartHttpServer(
 	port int,
 	handler http.Handler,
-	options func(server *http.Server, registerSignalHook func(prePost int, sig os.Signal, f func()) error),
+	options func(server *http.Server, registerSignalHook RegisterSignalHook),
 ) {
 	defer func() {
 		DBCloseAll()
