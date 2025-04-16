@@ -195,7 +195,7 @@ func (m JMap) GetStruct(key string, v interface{}) error {
 		if err != nil {
 			return fmt.Errorf("key(%s)值(%v)json_encode失败,err=%s", key, i, err)
 		}
-		if err = json.Unmarshal(b, v); err != nil {
+		if err = json.Unmarshal(b, &v); err != nil {
 			return fmt.Errorf("key(%s)值(%s)json_decode失败,err=%s", key, string(b), err)
 		}
 		return nil
@@ -208,7 +208,7 @@ func (m JMap) ToStruct(v interface{}) error {
 	if err != nil {
 		return fmt.Errorf("map(%v)json_encode失败,err=%s", m, err)
 	}
-	if err = json.Unmarshal(b, v); err != nil {
+	if err = json.Unmarshal(b, &v); err != nil {
 		return fmt.Errorf("map(%s)json_decode失败,err=%s", string(b), err)
 	}
 	return nil
