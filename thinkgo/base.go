@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -282,6 +283,21 @@ func StartHttpServer(
 			panic(err)
 		} else {
 			Logger.Info("[StartHttpServer]关闭httpserver")
+		}
+	}
+}
+
+func ListenShutdownSignals() {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+loop:
+	for {
+		select {
+		case <-ch:
+			Logger.Infof("服务开始关闭-%s", AppName)
+			CallShutdownHooks()
+			Logger.Infof("服务已关闭-%s", AppName)
+			break loop
 		}
 	}
 }
