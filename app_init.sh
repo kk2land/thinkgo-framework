@@ -7,6 +7,8 @@ module="$1"
 
 app_path="app/$module"
 
+mkdir -p src/cmd
+
 mkdir -p "$app_path"
 mkdir "$app_path/config"
 mkdir "$app_path/bin"
