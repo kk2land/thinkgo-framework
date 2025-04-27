@@ -80,7 +80,7 @@ func (r *RandSource) Put(rd rand.Source) {
 	r.Pool.Put(rd)
 }
 
-func SendChannelInterface[T any](C chan T, obj T) (err error) {
+func SafeSendChannel[T any](C chan T, obj T) (err error) {
 	defer func() {
 		if err1 := recover(); err1 != nil {
 			err = Recover2Error(err1)

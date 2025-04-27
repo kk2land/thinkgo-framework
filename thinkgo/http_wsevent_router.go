@@ -104,7 +104,7 @@ func (r *wsEventRouter) EventRegister(event string, handler WsEventHandler) {
 
 func (r *wsEventRouter) SendForKeys(msg *WsEventMessage, keys ...string) {
 	r.ctxMap.RangeByKeys(func(key string, ctx *wsEventContext) {
-		if err := SendChannelInterface(ctx.sendC, msg); err != nil {
+		if err := SafeSendChannel(ctx.sendC, msg); err != nil {
 			Logger.Errorf("[wsEventContext][SendForKeys] tokey=%s,msg=%s,panic=%s", ctx.key, msg, err)
 			r.callWriteFailHandler(ctx.key, msg, err)
 		}
@@ -113,7 +113,7 @@ func (r *wsEventRouter) SendForKeys(msg *WsEventMessage, keys ...string) {
 
 func (r *wsEventRouter) SendForParams(msg *WsEventMessage, paramsString string) {
 	r.ctxMap.Range(func(key string, ctx *wsEventContext) {
-		if err := SendChannelInterface(ctx.sendC, msg); err != nil {
+		if err := SafeSendChannel(ctx.sendC, msg); err != nil {
 			Logger.Errorf("[wsEventContext][SendForParams] tokey=%s,msg=%s,panic=%s", ctx.key, msg, err)
 			r.callWriteFailHandler(ctx.key, msg, err)
 		}
@@ -122,7 +122,7 @@ func (r *wsEventRouter) SendForParams(msg *WsEventMessage, paramsString string) 
 
 func (r *wsEventRouter) SendForAll(msg *WsEventMessage) {
 	r.ctxMap.Range(func(key string, ctx *wsEventContext) {
-		if err := SendChannelInterface(ctx.sendC, msg); err != nil {
+		if err := SafeSendChannel(ctx.sendC, msg); err != nil {
 			Logger.Errorf("[wsEventContext][SendForAll] tokey=%s,msg=%s,panic=%s", ctx.key, msg, err)
 			r.callWriteFailHandler(ctx.key, msg, err)
 		}
@@ -134,7 +134,7 @@ func (r *wsEventRouter) SendForParamsExcludeKeys(msg *WsEventMessage, paramsStri
 		if _, ok := excludeKeys[key]; ok {
 			return
 		}
-		if err := SendChannelInterface(ctx.sendC, msg); err != nil {
+		if err := SafeSendChannel(ctx.sendC, msg); err != nil {
 			Logger.Errorf("[wsEventContext][SendForParams] tokey=%s,msg=%s,panic=%s", ctx.key, msg, err)
 			r.callWriteFailHandler(ctx.key, msg, err)
 		}
@@ -146,7 +146,7 @@ func (r *wsEventRouter) SendForAllExcludeKeys(msg *WsEventMessage, excludeKeys m
 		if _, ok := excludeKeys[key]; ok {
 			return
 		}
-		if err := SendChannelInterface(ctx.sendC, msg); err != nil {
+		if err := SafeSendChannel(ctx.sendC, msg); err != nil {
 			Logger.Errorf("[wsEventContext][SendForAll] tokey=%s,msg=%s,panic=%s", ctx.key, msg, err)
 			r.callWriteFailHandler(ctx.key, msg, err)
 		}
@@ -204,7 +204,7 @@ func (r *wsEventRouter) httpHandle(c *gin.Context) {
 	ctx := r.ctxMap.loadCtx(key, logger, c)
 	ctx.logger.Debug("[wsEventRouter][httpHandle] ctx run")
 	send := func(inData interface{}) {
-		if err := SendChannelInterface(ctx.inC, inData); err != nil {
+		if err := SafeSendChannel(ctx.inC, inData); err != nil {
 			panic(wsEventRouterCloseErr)
 		}
 	}

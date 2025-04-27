@@ -86,7 +86,7 @@ func (c *wsEventContext) CtxSafeParamGet(k string) (interface{}, bool) {
 }
 
 func (c *wsEventContext) Send(msg *WsEventMessage) {
-	if err := SendChannelInterface(c.sendC, msg); err != nil {
+	if err := SafeSendChannel(c.sendC, msg); err != nil {
 		c.logger.Errorf("[wsEventContext][Send] msg=%s,panic=%s", msg, err)
 		c.router.callWriteFailHandler(c.key, msg, err)
 	}
@@ -113,7 +113,7 @@ func (c *wsEventContext) SendForAllExcludeKeys(msg *WsEventMessage, excludeKeys 
 }
 
 func (c *wsEventContext) Close() {
-	_ = SendChannelInterface(c.inC, &wsEventContextInStop{})
+	_ = SafeSendChannel(c.inC, &wsEventContextInStop{})
 }
 
 func newWsEventContext(
