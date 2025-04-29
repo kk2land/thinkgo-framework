@@ -266,12 +266,16 @@ func NginxHash(key string, num int) int {
 	return int((Crc32(key)>>16)&0x7fff) % num
 }
 
-func SafeGo(f func()) {
+func SafeGo(noPanic bool, f func()) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				OpsAlarm("%s panic退出-%v", AppName, r)
-				panic(r)
+				if !noPanic {
+					OpsAlarm("%s panic退出-%v", AppName, r)
+					panic(r)
+				} else {
+					Logger.Errorf("%s 协程panic-%v", AppName, r)
+				}
 			}
 		}()
 		f()
