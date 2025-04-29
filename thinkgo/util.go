@@ -271,10 +271,10 @@ func SafeGo(noPanic bool, f func()) {
 		defer func() {
 			if r := recover(); r != nil {
 				if !noPanic {
-					OpsAlarm("%s panic退出-%v", AppName, r)
+					OpsAlarm("%s 协程panic退出-%v", AppName, r)
 					panic(r)
 				} else {
-					Logger.Errorf("%s 协程panic-%v", AppName, r)
+					OpsAlarm("%s 协程panic错误-%v", AppName, r)
 				}
 			}
 		}()
