@@ -3,6 +3,7 @@ package thinkgo
 import (
 	"errors"
 	"fmt"
+	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
@@ -20,6 +21,13 @@ func DBErrRetry(err error) bool {
 	s := err.Error()
 	if s == "invalid connection" {
 		return true
+	}
+	if mysqlErr, ok := err.(*mysql.MySQLError); ok {
+		switch mysqlErr.Number {
+		//1213 = deadlock
+		case 2002, 2006, 2013, 1213:
+			return true
+		}
 	}
 	return false
 }
