@@ -34,14 +34,14 @@ type DBInstance struct {
 	IsCluster bool
 }
 
-func (db *DBInstance) Exec1(backoff BackoffPolicy, f func() error) error {
+func (db *DBInstance) ExecWithBackoff(backoff BackoffPolicy, f func(*DBInstance) error) error {
 	cb := func() (err error) {
 		defer func() {
 			if err1 := recover(); err1 != nil {
 				err = Recover2Error(err)
 			}
 		}()
-		return f()
+		return f(db)
 	}
 	var err error
 	for backoff.Next() {
