@@ -246,7 +246,6 @@ func SetProcessName(name string) error {
 	// Syscall PRCTL, not working on Darwin for me
 	// bytes := append([]byte(name), 0)
 	// ptr := unsafe.Pointer(&bytes[0])
-
 	// if _, _, errno := syscall.RawSyscall6(syscall.SYS_PRCTL, syscall.PR_SET_NAME, uintptr(ptr), 0, 0, 0, 0); errno != 0 {
 	// 	return syscall.Errno(errno)
 	// }
@@ -265,4 +264,16 @@ func UnsafeBytesToStr(b []byte) string {
 
 func NginxHash(key string, num int) int {
 	return int((Crc32(key)>>16)&0x7fff) % num
+}
+
+func SafeGo(f func()) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				OpsAlarm("%s panic退出-%v", AppName, r)
+				panic(r)
+			}
+		}()
+		f()
+	}()
 }
