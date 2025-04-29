@@ -7,7 +7,11 @@ module="$1"
 
 app_path="app/$module"
 
-mkdir -p src/cmd
+if [ -z "$module" ];then
+    mkdir -p src/cmd
+else
+    mkdir -p src/$module/cmd
+fi
 
 mkdir -p "$app_path"
 mkdir "$app_path/config"

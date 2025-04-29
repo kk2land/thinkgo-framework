@@ -37,7 +37,7 @@ maxRetryBackoff = 0     # 重试时，延迟最大毫秒重试，Default is 512 
 [database]
 [database.default]          # 必须有个default的配置
 driverName = "mysql"        # driver
-driverSourceName = "{user}:{password}@tcp(address:{port})/{database}?charset=utf8mb4"
+driverSourceName = "{user}:{password}@tcp({address}:{port})/{database}?charset=utf8mb4"
 connMaxLifetime = "xxs"     # maximum amount of time a connection may be reused. <0则不会关闭
 connMaxIdleTime = "xxs"     # the maximum amount of time a connection may be idle. <0则不会管理
 maxOpenConns = 10           # 连接池大小
