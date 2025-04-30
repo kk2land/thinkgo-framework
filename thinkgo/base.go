@@ -30,7 +30,7 @@ const (
 
 var (
 	ModuleName  string //指定module名称，编译时指定
-	InModule    bool   //是否启动的module
+	InModule    bool   //是否在module下启动
 	RootPath    string //项目根路径
 	AppPath     string
 	ConfigPath  string
@@ -132,7 +132,6 @@ func init() {
 	})
 	opsAlarmGoQueue.Start()
 
-	//todo
 	switch CommandName {
 	case CommandNameHttp, CommandNameCheck:
 		initHttpServer()
@@ -290,6 +289,14 @@ func StartHttpServer(
 func ListenShutdownSignals() {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+
+	Logger.Infof("[ListenShutdownSignals]开始启动server")
+	if err := WritePidFile(); err != nil {
+		Logger.Errorf("[ListenShutdownSignals]写入pidfile失败 - %s", err)
+		panic(err)
+	}
+	CallStartHooks()
+
 loop:
 	for {
 		select {

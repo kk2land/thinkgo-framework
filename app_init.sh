@@ -22,10 +22,15 @@ mkdir "$app_path"/runtime/{log,pid}
 touch $app_path/bin/.gitkeep
 
 echo ".gitignore内容"
-echo "/.idea"
-echo "app/bin/*"
-echo "app/runtime/log/*"
-echo "app/runtime/pid/*"
-echo "app/*/bin/*"
-echo "app/*/runtime/log/*"
-echo "app/*/runtime/pid/*"
+cat <<EOF
+/.idea
+/x.sh
+/app/bin/*
+/app/config/app_local.toml
+/app/runtime/log/*
+/app/runtime/pid/*
+/app/*/bin/*
+/app/*/config/app_local.toml
+/app/*/runtime/log/*
+/app/*/runtime/pid/*
+EOF

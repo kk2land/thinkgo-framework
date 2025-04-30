@@ -4,15 +4,15 @@ import (
 	"time"
 )
 
-// 重试的帮助类
+// BackoffPolicy 重试的帮助类
+//
 //	for backoff.Next() {
-// 		err := ...
+//		err := ...
 //		if err != nil && backoff.End() {
 //			break
 //		}
 //		time.Sleep(backoff.Get())
 //	}
-
 type BackoffPolicy interface {
 	Next() bool //是否还有next
 	End() bool  //当前是否处于end

@@ -5,12 +5,13 @@ import (
 )
 
 type InsertOnDuplicateBuilder struct {
-	cols int
-	sql1 string
-	sql2 string
-	sql3 string
-	sql  *strings.Builder
-	args []interface{}
+	cols     int
+	sql1     string
+	sql2     string
+	sql3     string
+	capacity int
+	sql      *strings.Builder
+	args     []interface{}
 }
 
 func NewInsertOnDuplicateBuilder(
@@ -19,7 +20,7 @@ func NewInsertOnDuplicateBuilder(
 	keyNum int, //前几列是key
 ) *InsertOnDuplicateBuilder {
 	//第一部分
-	sql1 := "insert into `" + tableName + "`(`" + strings.Join(cols, ",") + "`) values"
+	sql1 := "insert into `" + tableName + "`(`" + strings.Join(cols, "`,`") + "`) values"
 	//第二部分
 	var sql2 string
 	{
@@ -43,7 +44,7 @@ func NewInsertOnDuplicateBuilder(
 			if i < keyNum {
 				continue
 			}
-			tmp[i] = "`" + col + "`=values(`" + col + "`)"
+			tmp[i-keyNum] = "`" + col + "`=values(`" + col + "`)"
 		}
 		sql3 = " on duplicate key update " + strings.Join(tmp, ",")
 	}
@@ -56,17 +57,19 @@ func NewInsertOnDuplicateBuilder(
 }
 
 func (m *InsertOnDuplicateBuilder) InitArgs(capacity int) {
+	m.capacity = capacity
 	//构建sql
 	m.sql = &strings.Builder{}
 	m.sql.Grow(len(m.sql1) + len(m.sql2)*capacity + capacity - 1 + len(m.sql3))
+	m.sql.WriteString(m.sql1)
 	//构建参数
-	m.args = make([]interface{}, capacity+1)
+	m.args = make([]interface{}, capacity*m.cols+1)
 }
 
 func (m *InsertOnDuplicateBuilder) AppendArgs(i int, args ...interface{}) {
 	//构建sql
 	m.sql.WriteString(m.sql2)
-	if i < len(m.args) {
+	if i < m.capacity-1 {
 		m.sql.WriteByte(',')
 	}
 	//构建参数
