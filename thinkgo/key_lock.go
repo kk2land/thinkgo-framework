@@ -35,10 +35,12 @@ func keyLockMemItemNew(k string) interface{} {
 	return &keyLockMemItem{ch: ch, counter: 1}
 }
 
+// KeyLockMem 在内存中对某个key进行上锁，上锁成功则调用函数f，上锁失败则panic，返回函数f的返回值
 func KeyLockMem(key string, f KeyLockHandler) interface{} {
 	return KeyLockMemTimeout(key, 10*time.Second, f)
 }
 
+// KeyLockMemTry 在内存中对某个key进行尝试上锁，返回函数f的返回值，locked=true则表上锁成功；false则表示上锁失败；
 func KeyLockMemTry(key string, f KeyLockHandler) (obj interface{}, locked bool) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -51,6 +53,7 @@ func KeyLockMemTry(key string, f KeyLockHandler) (obj interface{}, locked bool) 
 	return KeyLockMemTimeout(key, 0, f), true
 }
 
+// KeyLockMemTimeout 在内存中对某个key进行上锁，上锁成功则调用函数f，失败则panic，带超时功能
 func KeyLockMemTimeout(key string, timeout time.Duration, f KeyLockHandler) interface{} {
 	var item *keyLockMemItem
 	shard := keyLockMemMap.GetShard(key)
@@ -99,20 +102,24 @@ end
 return 0
 `
 
+// KeyLockRedisDefault 获取基于默认redis对某个key进行上锁
 func KeyLockRedisDefault() *KeyLockRedis {
 	return &KeyLockRedis{
 		Client: RedisDefaultOrPanic(),
 	}
 }
 
+// KeyLockRedis 基于redis对某个key进行上锁
 type KeyLockRedis struct {
 	Client *RedisClient
 }
 
+// Lock 上锁成功调用函数f，不成功则panic
 func (l *KeyLockRedis) Lock(key string, f KeyLockHandler) interface{} {
 	return l.LockTimeout(key, 10*time.Second, f)
 }
 
+// LockTry 上锁成功调用函数f，不成功则locked=false
 func (l *KeyLockRedis) LockTry(key string, f KeyLockHandler) (obj interface{}, locked bool) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -125,6 +132,7 @@ func (l *KeyLockRedis) LockTry(key string, f KeyLockHandler) (obj interface{}, l
 	return l.LockTimeout(key, 0, f), true
 }
 
+// LockTimeout 上锁成功调用函数f，不成功则panic，带超时功能
 func (l *KeyLockRedis) LockTimeout(key string, timeout time.Duration, f KeyLockHandler) interface{} {
 	token := fmt.Sprintf("%s%d", keyLockRedisTokenPrefix, time.Now().UnixNano()/1000000)
 	key = "redislock|" + key
@@ -170,12 +178,14 @@ func (l *KeyLockRedis) LockTimeout(key string, timeout time.Duration, f KeyLockH
 // KeyLockMySQL start
 var keyLockMySQLPrefix = "tkgokl-" + AppName + "-"
 
+// KeyLockMySQLDefault 获取基于默认数据库配置的
 func KeyLockMySQLDefault() *KeyLockMySQL {
 	return &KeyLockMySQL{
 		Client: DBDefaultOrPanic(),
 	}
 }
 
+// KeyLockMySQL 基于mysql的对某个key进行上锁
 type KeyLockMySQL struct {
 	Client *DBInstance
 }
@@ -196,7 +206,7 @@ func (l *KeyLockMySQL) LockTry(key string, f KeyLockHandler) (obj interface{}, l
 	return l.LockTimeout(key, 0, f), true
 }
 
-// 参数timeout会int(timeout.Seconds())，向下取整1秒
+// LockTimeout 参数timeout会int(timeout.Seconds())，向下取整1秒
 func (l *KeyLockMySQL) LockTimeout(key string, timeout time.Duration, f KeyLockHandler) interface{} {
 	sess := l.Client.NewSession()
 	defer sess.Close()

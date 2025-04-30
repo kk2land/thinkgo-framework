@@ -106,6 +106,7 @@ func httpErrorHandler(c *gin.Context) {
 	c.Next()
 }
 
+// HttpLogger 基于gin.Context获取当前请求的日志对象
 func HttpLogger(c *gin.Context) FieldLogger {
 	if logger, ok := c.Get(httpContextLogger); ok {
 		return logger.(FieldLogger)
@@ -114,15 +115,18 @@ func HttpLogger(c *gin.Context) FieldLogger {
 	}
 }
 
+// HttpEngine 获取gin.Engine
 func HttpEngine() *gin.Engine {
 	return httpEngine
 }
 
+// HttpRouter 获取gin.IRouter
 func HttpRouter() gin.IRouter {
 	HttpEngine()
 	return httpRouter
 }
 
+// HttpStartServer 启动gin的http-server
 func HttpStartServer() {
 	port := Config.Http.Port
 	if port <= 0 {
@@ -144,7 +148,7 @@ func HttpStartServer() {
 	StartHttpServer(
 		port,
 		h2c.NewHandler(handler, &http2.Server{}),
-		func(server *http.Server, registerSignalHook RegisterSignalHook) {
+		func(server *http.Server, registerSignalHook HttpServerRegisterSignalHook) {
 			if Config.Http.ReadTimeout != 0 {
 				server.ReadTimeout = Config.Http.ReadTimeout.ToDuration()
 			}
@@ -161,6 +165,7 @@ func HttpStartServer() {
 	)
 }
 
+// HttpWebsocketUpgrade 处理websocket客户端连接
 func HttpWebsocketUpgrade(c *gin.Context) (*websocket.Conn, error) {
 	up := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
@@ -170,6 +175,7 @@ func HttpWebsocketUpgrade(c *gin.Context) (*websocket.Conn, error) {
 	return up.Upgrade(c.Writer, c.Request, nil)
 }
 
+// HttpPort 获取当前http-server的端口
 func HttpPort() int {
 	return httpPort
 }

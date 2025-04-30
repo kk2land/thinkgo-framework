@@ -12,8 +12,7 @@ import (
 	"xorm.io/xorm"
 )
 
-// DBDefaultOrPanic() or DBOrPanic("") 获取xorm实例
-
+// DBErrRetry 判断err是否是可以重试的错误
 func DBErrRetry(err error) bool {
 	if ErrIsTimeout(err) || ErrIsBrokenPipe(err) {
 		return true
@@ -36,12 +35,14 @@ var dbInstanceMap = NewInstanceMap(dbCreate)
 var dbInstanceDefault *DBInstance
 var dbInstanceOnce sync.Once
 
+// DBInstance 数据库操作对象
 type DBInstance struct {
 	xorm.EngineInterface
 	Name      string
 	IsCluster bool
 }
 
+// ExecWithBackoff 带判断错误是可以重试的错误则会进行错误操作
 func (db *DBInstance) ExecWithBackoff(backoff BackoffPolicy, f func(*DBInstance) error) error {
 	cb := func() (err error) {
 		defer func() {
@@ -63,6 +64,21 @@ func (db *DBInstance) ExecWithBackoff(backoff BackoffPolicy, f func(*DBInstance)
 		time.Sleep(backoff.Get())
 	}
 	return nil
+}
+
+func (db *DBInstance) Close() (err error) {
+	dbInstanceMap.Delete(db.Name)
+	if db.IsCluster {
+		eg := db.EngineInterface.(*xorm.EngineGroup)
+		err = eg.Close()
+	} else {
+		e := db.EngineInterface.(*xorm.Engine)
+		err = e.Close()
+	}
+	if err != nil {
+		Logger.Errorf("[DBInstance]close db[%s] fail - %s", db.Name, err.Error())
+	}
+	return
 }
 
 func dbCreate(name string) (interface{}, error) {
@@ -113,6 +129,7 @@ func dbCreate(name string) (interface{}, error) {
 	return &db, nil
 }
 
+// DBDefault 获取默认的数据库操作对象
 func DBDefault() (*DBInstance, error) {
 	dbInstanceOnce.Do(func() {
 		dbInstanceDefault, _ = DB("default")
@@ -123,6 +140,7 @@ func DBDefault() (*DBInstance, error) {
 	return nil, errors.New("db[default] not exists")
 }
 
+// DBDefaultOrPanic 获取默认的数据库操作对象，获取失败则panic
 func DBDefaultOrPanic() *DBInstance {
 	if d, err := DBDefault(); err != nil {
 		panic(err)
@@ -131,6 +149,7 @@ func DBDefaultOrPanic() *DBInstance {
 	}
 }
 
+// DB 基于name获取数据库操作对象
 func DB(name string) (*DBInstance, error) {
 	obj, err := dbInstanceMap.LoadOrCreate(name)
 	if err != nil {
@@ -139,6 +158,7 @@ func DB(name string) (*DBInstance, error) {
 	return obj.(*DBInstance), nil
 }
 
+// DB 基于name获取数据库操作对象，否则panic
 func DBOrPanic(name string) *DBInstance {
 	if d, err := DB(name); err != nil {
 		panic(err)
@@ -147,6 +167,7 @@ func DBOrPanic(name string) *DBInstance {
 	}
 }
 
+// DBCloseAll 关闭全部数据对象
 func DBCloseAll() {
 	dbInstanceMap.Clear(func(name string, inst interface{}) {
 		var err error

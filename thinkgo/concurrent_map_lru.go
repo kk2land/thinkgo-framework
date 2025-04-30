@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// CMapLRU 带有LRU功能的并发map
-
 type cMapLRUShardItem[T any] struct {
 	v        T
 	expireAt time.Time
@@ -110,6 +108,7 @@ func (s *CMapLRUShard[T]) Delete(key string) {
 	s.cache.Remove(key)
 }
 
+// CMapLRU 带有LRU功能的并发map
 type CMapLRU[T any] struct {
 	shards      []*CMapLRUShard[T]
 	shardsCount uint32

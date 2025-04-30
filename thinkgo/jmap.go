@@ -7,6 +7,7 @@ import (
 	"strconv"
 )
 
+// JMap 反序列化json的帮助类
 type JMap map[string]interface{}
 
 func JString(i interface{}) (string, bool) {
@@ -189,13 +190,14 @@ func (m JMap) GetArr(key string) ([]interface{}, bool) {
 	return nil, false
 }
 
-func (m JMap) GetStruct(key string, v interface{}) error {
+// GetStruct 从JMap中直接获取某个struct，pointer需要传struct的指针的指针
+func (m JMap) GetStruct(key string, pointer interface{}) error {
 	if i, ok := m[key]; ok {
 		b, err := json.Marshal(i)
 		if err != nil {
 			return fmt.Errorf("key(%s)值(%v)json_encode失败,err=%s", key, i, err)
 		}
-		if err = json.Unmarshal(b, &v); err != nil {
+		if err = json.Unmarshal(b, &pointer); err != nil {
 			return fmt.Errorf("key(%s)值(%s)json_decode失败,err=%s", key, string(b), err)
 		}
 		return nil
@@ -203,12 +205,13 @@ func (m JMap) GetStruct(key string, v interface{}) error {
 	return fmt.Errorf("key不存在-%s", key)
 }
 
-func (m JMap) ToStruct(v interface{}) error {
+// ToStruct 将JMap转换成某个struct，pointer需要传struct的指针的指针
+func (m JMap) ToStruct(pointer interface{}) error {
 	b, err := json.Marshal(m)
 	if err != nil {
 		return fmt.Errorf("map(%v)json_encode失败,err=%s", m, err)
 	}
-	if err = json.Unmarshal(b, &v); err != nil {
+	if err = json.Unmarshal(b, &pointer); err != nil {
 		return fmt.Errorf("map(%s)json_decode失败,err=%s", string(b), err)
 	}
 	return nil

@@ -11,6 +11,7 @@ import (
 )
 
 // KeyStore，业务map，没有读取到则会从backend读取，同时set也会写入backend
+// todo 继续完善文档
 
 var KeyStoreDefaultCacheSize = 1 * 1024 * 1024
 var keyStoreDefaultCacheOnce sync.Once

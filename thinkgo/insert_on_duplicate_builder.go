@@ -4,6 +4,7 @@ import (
 	"strings"
 )
 
+// InsertOnDuplicateBuilder 构建mysql的insert on duplicate key update的批量操作
 type InsertOnDuplicateBuilder struct {
 	cols     int
 	sql1     string

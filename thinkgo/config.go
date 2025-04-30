@@ -11,6 +11,7 @@ import (
 
 // 框架配置类
 
+// ConfigTypeDuration 让toml的值支持时间duration格式：100、100s、100m...
 type ConfigTypeDuration time.Duration
 
 func (d *ConfigTypeDuration) UnmarshalText(text []byte) error {

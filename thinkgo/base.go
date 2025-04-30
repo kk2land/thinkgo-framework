@@ -23,28 +23,28 @@ const (
 	envKeyInternalHttpPort = "_TK_Internal_HttpPort"
 	envKeyLogConsole       = "_TK_LogConsole"
 
-	CommandNameHttp  = "http"
-	CommandNameGrpc  = "grpc"
-	CommandNameCheck = "check"
+	CommandNameHttp  = "http"  //二进制命令名-http
+	CommandNameGrpc  = "grpc"  //二进制命令-grpc
+	CommandNameCheck = "check" //二进制命令-check: 检查配置/环境变量是否有问题
 )
 
 var (
 	ModuleName  string //指定module名称，编译时指定
 	InModule    bool   //是否在module下启动
 	RootPath    string //项目根路径
-	AppPath     string
-	ConfigPath  string
-	RuntimePath string
+	AppPath     string //应用路径 = app or app/{module}
+	ConfigPath  string //配置路径 = app/config or app/{module}/config
+	RuntimePath string //运行时文件路径 = app/runtime or app/{module}/runtime
 
-	CommandName string
-	AppName     string
-	AppStatus   string
-	AppDebug    bool
-	Hostname    string
-	Pid         int
+	CommandName string //当前启动的二进制名
+	AppName     string //从配置中读取的应用名
+	AppStatus   string //环境变量或.env文件读取的_TK_AppStatus，用来判断app运行环境
+	AppDebug    bool   //是否是调试模式允许，Logger.Debug(f)会打印出来，从配置文件读取
+	Hostname    string //当前主机的hostname
+	Pid         int    //当前的进程pid
 
-	Config *appConfig
-	Logger FieldLogger
+	Config *appConfig  //当前应用的配置对象
+	Logger FieldLogger //当前应用的logger对象
 
 	opsAlarmGoQueue *GoQueue
 	opsAlarmSyslog  *syslog.Writer = nil
@@ -166,10 +166,12 @@ func initPathVars(dir string) error {
 	return nil
 }
 
+// OpsAlarm 进行tg告警，要依赖运维部署环境
 func OpsAlarm(format string, v ...interface{}) {
 	OpsAlarmWithGroup(Config.OpsAlarm, format, v...)
 }
 
+// OpsAlarmWithGroup 进行tg告警，可以指定告警组
 func OpsAlarmWithGroup(group string, format string, v ...interface{}) {
 	Logger.Errorf(format, v...)
 	buf := BytesBuffer1024.Get()
@@ -186,6 +188,7 @@ func OpsAlarmWithGroup(group string, format string, v ...interface{}) {
 	opsAlarmGoQueue.Send(buf.String())
 }
 
+// WritePidFile 写当前进程的pid文件
 func WritePidFile() error {
 	return WriteFile(filepath.Join(RuntimePath, "pid", AppName+".pid"), []byte(strconv.Itoa(Pid)))
 }
@@ -201,6 +204,7 @@ var shutdownHooks = struct {
 	done  bool
 }{}
 
+// AddStartHook 添加http-server等服务启动时的回调
 func AddStartHook(h func()) {
 	startHooks.mu.Lock()
 	defer startHooks.mu.Unlock()
@@ -210,6 +214,11 @@ func AddStartHook(h func()) {
 	startHooks.hooks = append(startHooks.hooks, h)
 }
 
+// CallStartHooks 触发http-server等服务启动时的回调，以下使用情景自动有效
+//
+//	thinkgo.StartHttpServer
+//	thinkgo.ListenShutdownSignals
+//	thinkgo.HttpStartServer
 func CallStartHooks() {
 	startHooks.mu.Lock()
 	defer startHooks.mu.Unlock()
@@ -219,6 +228,7 @@ func CallStartHooks() {
 	startHooks.done = true
 }
 
+// AddShutdownHook 添加服务停止时的回调
 func AddShutdownHook(h func(wait *sync.WaitGroup)) {
 	shutdownHooks.mu.Lock()
 	defer shutdownHooks.mu.Unlock()
@@ -228,6 +238,11 @@ func AddShutdownHook(h func(wait *sync.WaitGroup)) {
 	shutdownHooks.hooks = append(shutdownHooks.hooks, h)
 }
 
+// CallShutdownHooks 触发服务停止时的回调，以下使用情景自动有效
+//
+//	thinkgo.StartHttpServer
+//	thinkgo.ListenShutdownSignals
+//	thinkgo.HttpStartServer
 func CallShutdownHooks() {
 	shutdownHooks.mu.Lock()
 	defer shutdownHooks.mu.Unlock()
@@ -240,12 +255,14 @@ func CallShutdownHooks() {
 	Logger.Infof("CallShutdownHooks finished")
 }
 
-type RegisterSignalHook func(prePost int, sig os.Signal, f func()) error
+// HttpServerRegisterSignalHook http-server注册信号处理回调
+type HttpServerRegisterSignalHook func(prePost int, sig os.Signal, f func()) error
 
+// StartHttpServer 不使用gin框架直接启动http-server(kill -HUP {pid}，支持平滑重启)
 func StartHttpServer(
 	port int,
 	handler http.Handler,
-	options func(server *http.Server, registerSignalHook RegisterSignalHook),
+	options func(server *http.Server, registerSignalHook HttpServerRegisterSignalHook),
 ) {
 	defer func() {
 		DBCloseAll()
@@ -286,7 +303,13 @@ func StartHttpServer(
 	}
 }
 
+// ListenShutdownSignals 不启动http-server，直接启动一个运行服务，监听信号退出
 func ListenShutdownSignals() {
+	defer func() {
+		DBCloseAll()
+		RedisCloseAll()
+	}()
+
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 

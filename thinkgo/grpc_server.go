@@ -15,8 +15,6 @@ import (
 	"time"
 )
 
-// Grpc Server
-
 const grpcMetaDataAuthentication = "tk-authorization"
 
 var grpcServerOnce sync.Once
@@ -181,6 +179,7 @@ func GrpcEnable() bool {
 	return false
 }
 
+// GrpcServer 获取GrpcServer
 func GrpcServer() *grpc.Server {
 	grpcServerOnce.Do(func() {
 		//todo 读取配置初始化server
