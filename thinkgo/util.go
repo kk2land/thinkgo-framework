@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -284,4 +285,20 @@ func SafeGo(noPanic bool, f func()) {
 		}()
 		f()
 	}()
+}
+
+// SortMap 对map的key进行排序，最后返回排序号的value slice
+func SortMap[K comparable, V any](m map[K]V, less func(i, j int) bool) []V {
+	keys := make([]K, len(m))
+	keysSize := 0
+	for key, _ := range m {
+		keys[keysSize] = key
+		keysSize++
+	}
+	sort.Slice(keys, less)
+	ret := make([]V, len(m))
+	for i, key := range keys {
+		ret[i] = m[key]
+	}
+	return ret
 }
