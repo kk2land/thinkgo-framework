@@ -288,14 +288,16 @@ func SafeGo(noPanic bool, f func()) {
 }
 
 // SortMap 对map的key进行排序，最后返回排序号的value slice
-func SortMap[K comparable, V any](m map[K]V, less func(i, j int) bool) []V {
+func SortMap[K comparable, V any](m map[K]V, less func(keys []K, i, j int) bool) []V {
 	keys := make([]K, len(m))
 	keysSize := 0
 	for key, _ := range m {
 		keys[keysSize] = key
 		keysSize++
 	}
-	sort.Slice(keys, less)
+	sort.Slice(keys, func(i, j int) bool {
+		return less(keys, i, j)
+	})
 	ret := make([]V, len(m))
 	for i, key := range keys {
 		ret[i] = m[key]
