@@ -17,7 +17,7 @@ import (
 
 //go get -u go.uber.org/zap
 
-const loggerTimeFormatRFC3339 = "2006-01-02T15:04:05.999Z07:00"
+const loggerTimeFormatRFC3339 = "2006-01-02T15:04:05.000Z07:00"
 const loggerTimeFormatDaily = "20060102"
 const loggerFieldId = "id"
 
