@@ -99,6 +99,7 @@ func (k fieldLoggerFieldK) Write(b *bytes.Buffer) {
 
 var loggerPid string
 
+// FieldLogger 框架的日志对象
 type FieldLogger interface {
 	With(args ...interface{}) FieldLogger
 
@@ -130,6 +131,7 @@ func iniAppLogger(name string) FieldLogger {
 	return NewLogger(name)
 }
 
+// NewLogger 基于name创建按天分隔写日志文件的日志对象
 func NewLogger(name string) FieldLogger {
 	logger := logrus.New()
 	if AppDebug {
@@ -155,6 +157,10 @@ type loggerLogrus struct {
 	*logrus.Logger
 }
 
+// With 给日志添加前缀，并且返回新的日志对象
+//
+//	args参数的个数必须是偶数，最终会拼接成"key1=value1,key2=value2..."；
+//	如果value1是nil，则最终会拼接成"key1,key2=value2"
 func (l *loggerLogrus) With(args ...interface{}) FieldLogger {
 	size := len(args)
 	if size == 0 {

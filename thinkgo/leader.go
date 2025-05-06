@@ -12,10 +12,13 @@ import (
 
 type LeaderWatchHandler func(isLeader bool)
 
+// Leader 多个进程同时监听，抢占哪个是leader
 type Leader interface {
+	// Watch 注册回调函数，当leader有变化时，会触发回调
 	Watch(f LeaderWatchHandler)
 }
 
+// LeaderRedis 基于redis实现的Leader
 type LeaderRedis struct {
 	name         string
 	client       *RedisClient
@@ -23,7 +26,7 @@ type LeaderRedis struct {
 	handlers     []LeaderWatchHandler
 	addStartHook bool
 	done         chan Void
-	state        int32
+	state        atomic.Bool
 	stateCh      chan Void
 }
 
@@ -57,7 +60,7 @@ func (l *LeaderRedis) stop(wait *sync.WaitGroup) {
 }
 
 func (l *LeaderRedis) goNotify() {
-	var lastState int32 = 0
+	var lastState = false
 	var callHandler = func(f LeaderWatchHandler, isLeader bool) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -70,13 +73,13 @@ func (l *LeaderRedis) goNotify() {
 	for {
 		select {
 		case <-l.stateCh:
-			state := atomic.LoadInt32(&l.state)
+			state := l.state.Load()
 			if lastState == state {
 				continue
 			}
 			l.handlersMu.Lock()
 			for _, handler := range l.handlers {
-				callHandler(handler, state == 1)
+				callHandler(handler, state)
 			}
 			l.handlersMu.Unlock()
 			lastState = state
@@ -87,24 +90,42 @@ func (l *LeaderRedis) goNotify() {
 }
 
 func (l *LeaderRedis) goTick() {
+	ctx := context.Background()
+	script := `
+local key = KEYS[1]
+local value = ARGV[1]
+local ex = tonumber(ARGV[2])
+local ret = redis.call("SET", key, value, "EX", ex, "NX")
+if ret then
+    return 1
+else
+    ret = redis.call("GET", key)
+    if ret == value then
+        return redis.call("EXPIRE", key, ex)
+    else
+        return 0
+    end
+end
+`
+	var scriptSha1 string
+	if res := l.client.Raw().ScriptLoad(ctx, script); res.Err() != nil {
+		OpsAlarm("LeaderRedis(%s)ScriptLoad失败-%s", l.name, res.Err())
+		return
+	} else {
+		scriptSha1 = res.String()
+	}
+
 	key := l.client.Prefix("tk-leader-" + l.name)
 	token := fmt.Sprintf("%s-%d-%d", Hostname, Pid, time.Now().UnixNano()/1000000)
-	ttl := 15 * time.Second
+	ttl := 15
 	call := func() {
-		p := l.client.Raw().Pipeline()
-		cmd1 := p.SetNX(context.Background(), key, token, ttl)
-		cmd2 := p.Get(context.Background(), key)
-		if _, err := p.Exec(context.Background()); err != nil {
-			Logger.Errorf("LeaderRedis(%s)操作Redis错误,err=%s", l.name, err)
+		cmd := l.client.Raw().EvalSha(ctx, scriptSha1, []string{key}, token, ttl)
+		if cmd.Err() != nil {
+			OpsAlarm("LeaderRedis(%s)EvalSha错误-%s", l.name, cmd.Err())
+		} else if ret, err := cmd.Int(); err != nil {
+			OpsAlarm("LeaderRedis(%s)EvalSha返回不是int-%s", l.name, cmd.String())
 		} else {
-			if cmd1.Val() || cmd2.Val() == token {
-				atomic.StoreInt32(&l.state, 1)
-			} else {
-				atomic.StoreInt32(&l.state, 0)
-			}
-			select {
-			case l.stateCh <- VoidValue:
-			}
+			l.state.Store(ret == 1)
 		}
 	}
 	call()

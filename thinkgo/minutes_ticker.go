@@ -2,8 +2,7 @@ package thinkgo
 
 import "time"
 
-// MinutesTicker，每分钟的tick
-
+// MinutesTicker 每自然分钟的tick，并且启动时会自动矫正
 type MinutesTicker struct {
 	*time.Ticker
 	minutes int
