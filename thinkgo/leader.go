@@ -112,7 +112,7 @@ end
 		OpsAlarm("LeaderRedis(%s)ScriptLoad失败-%s", l.name, res.Err())
 		return
 	} else {
-		scriptSha1 = res.String()
+		scriptSha1 = res.Val()
 	}
 
 	key := l.client.Prefix("tk-leader-" + l.name)
@@ -121,11 +121,14 @@ end
 	call := func() {
 		cmd := l.client.Raw().EvalSha(ctx, scriptSha1, []string{key}, token, ttl)
 		if cmd.Err() != nil {
-			OpsAlarm("LeaderRedis(%s)EvalSha错误-%s", l.name, cmd.Err())
+			OpsAlarm("LeaderRedis(%s)EvalSha错误=%s,sha1=%s", l.name, cmd.Err(), scriptSha1)
 		} else if ret, err := cmd.Int(); err != nil {
-			OpsAlarm("LeaderRedis(%s)EvalSha返回不是int-%s", l.name, cmd.String())
+			OpsAlarm("LeaderRedis(%s)EvalSha返回不是int=%s", l.name, cmd.Val())
 		} else {
 			l.state.Store(ret == 1)
+			select {
+			case l.stateCh <- VoidValue:
+			}
 		}
 	}
 	call()
