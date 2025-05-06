@@ -21,6 +21,7 @@ type Leader interface {
 // LeaderRedis 基于redis实现的Leader
 type LeaderRedis struct {
 	name         string
+	id           int
 	client       *RedisClient
 	handlersMu   sync.Mutex
 	handlers     []LeaderWatchHandler
@@ -30,9 +31,10 @@ type LeaderRedis struct {
 	stateCh      chan Void
 }
 
-func LeaderRedisNew(name string, client *RedisClient) *LeaderRedis {
+func LeaderRedisNew(name string, id int, client *RedisClient) *LeaderRedis {
 	return &LeaderRedis{
 		name:    name,
+		id:      id,
 		client:  client,
 		done:    make(chan Void),
 		stateCh: make(chan Void, 1),
@@ -116,7 +118,7 @@ end
 	}
 
 	key := l.client.Prefix("tk-leader-" + l.name)
-	token := fmt.Sprintf("%s-%d-%d", Hostname, Pid, time.Now().UnixNano()/1000000)
+	token := fmt.Sprintf("%s-%d", Hostname, l.id)
 	ttl := 15
 	call := func() {
 		cmd := l.client.Raw().EvalSha(ctx, scriptSha1, []string{key}, token, ttl)
