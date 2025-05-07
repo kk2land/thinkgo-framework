@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// ConversionTime json/xorm将time.Time和string之间转换
 type ConversionTime struct {
 	time.Time
 }

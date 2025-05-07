@@ -3,8 +3,6 @@ package thinkgo
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
-	"strings"
-	"sync/atomic"
 	"time"
 )
 
@@ -25,42 +23,27 @@ end
 return ret
 `
 
+// RedisIntCmd redis返回int的command
 type RedisIntCmd struct {
 	*redis.Cmd
 	val int64
-}
-
-type RedisEval struct {
-	Script string
-	sha    atomic.Value
-	done   uint32
-}
-
-func (eval *RedisEval) Load(r *RedisClient) {
-	if !atomic.CompareAndSwapUint32(&eval.done, 0, 1) {
-		return
-	}
-	go func() {
-		str, err := r.Raw().ScriptLoad(context.Background(), eval.Script).Result()
-		if err == nil {
-			eval.sha.Store(str)
-		}
-		atomic.StoreUint32(&eval.done, 0)
-	}()
 }
 
 func (cmd *RedisIntCmd) Result() (int64, error) {
 	return cmd.val, cmd.Err()
 }
 
+// SetExf 带过期时间设置key和value，但是如果key存在，则不会更新过期时间
 func (r *RedisClient) SetExf(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.Cmd {
 	return r.client.Eval(ctx, redisSetExf, []string{r.Prefix(key)}, value, int(expiration.Seconds()))
 }
 
+// IncrEx 带过时间incr某个key，首次设置值时才会设置过期时间
 func (r *RedisClient) IncrEx(ctx context.Context, key string, expiration time.Duration) *RedisIntCmd {
 	return r.IncrByEx(ctx, key, 1, expiration)
 }
 
+// IncrByEx 带过时间incr某个key，首次设置值时才会设置过期时间
 func (r *RedisClient) IncrByEx(ctx context.Context, key string, val int64, expiration time.Duration) *RedisIntCmd {
 	cmd := r.client.Eval(ctx, redisIncrByEx, []string{r.Prefix(key)}, val, int(expiration.Seconds()))
 	var res int64 = 0
@@ -68,17 +51,4 @@ func (r *RedisClient) IncrByEx(ctx context.Context, key string, val int64, expir
 		res = i.(int64)
 	}
 	return &RedisIntCmd{Cmd: cmd, val: res}
-}
-
-func (r *RedisClient) Eval1(ctx context.Context, eval *RedisEval, keys []string, args ...interface{}) *redis.Cmd {
-	if sha := eval.sha.Load(); sha != nil {
-		cmd := r.Raw().EvalSha(ctx, sha.(string), keys, args...)
-		if err := cmd.Err(); err == nil {
-			return cmd
-		} else if !strings.HasPrefix(err.Error(), "NOSCRIPT No matching script") {
-			return cmd
-		}
-	}
-	eval.Load(r)
-	return r.Raw().Eval(ctx, eval.Script, keys, args...)
 }

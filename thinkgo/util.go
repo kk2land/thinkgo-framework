@@ -3,17 +3,11 @@ package thinkgo
 import (
 	"bytes"
 	"crypto/md5"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/crc32"
-	"io/ioutil"
 	"math/rand"
 	"net"
-	"net/http"
-	"net/url"
-	"os"
-	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -21,15 +15,28 @@ import (
 	"unsafe"
 )
 
+// TimeFormatYmd 时间格式 = Y-m-d
 var TimeFormatYmd = "2006-01-02"
+
+// TimeFormatYmdHis 时间格式 = Y-m-d H:i:s
 var TimeFormatYmdHis = "2006-01-02 15:04:05"
+
+// BytesBuffer1024 共用的内存池
 var BytesBuffer1024 = NewBytesBuffer(1024)
+
+// RandSourceDefault 共用的随机数对象池
 var RandSourceDefault = NewRandSource()
+
+// ConversionJsonNull json的null
 var ConversionJsonNull = []byte{'n', 'u', 'l', 'l'}
+
+// VoidValue 空值
 var VoidValue Void
 
+// Void 无意义类型，一般给channel使用
 type Void struct{}
 
+// BytesBuffer 内存池
 type BytesBuffer struct {
 	sync.Pool
 }
@@ -53,10 +60,12 @@ func (b *BytesBuffer) Put(buf *bytes.Buffer) {
 	b.Pool.Put(buf)
 }
 
+// StringBuffer 字符串池
 type StringBuffer struct {
 	sync.Pool
 }
 
+// RandSource 随机数对象池
 type RandSource struct {
 	sync.Pool
 }
@@ -81,6 +90,7 @@ func (r *RandSource) Put(rd rand.Source) {
 	r.Pool.Put(rd)
 }
 
+// SafeSendChannel 安全send channel，不会panic，而是返回error
 func SafeSendChannel[T any](C chan T, obj T) (err error) {
 	defer func() {
 		if err1 := recover(); err1 != nil {
@@ -91,6 +101,7 @@ func SafeSendChannel[T any](C chan T, obj T) (err error) {
 	return nil
 }
 
+// Recover2Error recover中获取error
 func Recover2Error(rec interface{}) (err error) {
 	switch v := rec.(type) {
 	case string:
@@ -107,6 +118,7 @@ type timeoutError interface {
 	Timeout() bool
 }
 
+// ErrIsTimeout 判断err是timeout
 func ErrIsTimeout(err error) bool {
 	if e, ok := err.(timeoutError); ok {
 		return e.Timeout()
@@ -115,6 +127,7 @@ func ErrIsTimeout(err error) bool {
 	}
 }
 
+// ErrIsBrokenPipe 判断err是连接中断
 func ErrIsBrokenPipe(err interface{}) bool {
 	var brokenPipe bool
 	if ne, ok := err.(*net.OpError); ok {
@@ -128,15 +141,18 @@ func ErrIsBrokenPipe(err interface{}) bool {
 	return brokenPipe
 }
 
+// LogErrAndPanic 写错误日志，并且panic
 func LogErrAndPanic(format string, v ...interface{}) {
 	Logger.Errorf(format, v...)
 	panic(fmt.Errorf(format, v...))
 }
 
+// Md5
 func Md5(s string) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(s)))
 }
 
+// Crc32
 func Crc32(s string) uint32 {
 	return crc32.ChecksumIEEE([]byte(s))
 }
@@ -148,6 +164,7 @@ const (
 	letterIdMax  = 63 / letterIdBits
 )
 
+// RandString 随机生成字符串
 func RandString(n int) string {
 	src := RandSourceDefault.Get()
 	defer RandSourceDefault.Put(src)
@@ -168,105 +185,25 @@ func RandString(n int) string {
 	return *(*string)(unsafe.Pointer(&b))
 }
 
-func ClientIp(r *http.Request) string {
-	if r == nil {
-		return "127.0.0.1"
-	}
-	val := r.Header.Get("X-Forwarded-For")
-	if len(val) > 0 {
-		vals := strings.Split(val, ",")
-		for _, v := range vals {
-			v = strings.TrimSpace(v)
-			if len(v) > 0 && v != "unknown" {
-				return v
-			}
-		}
-	} else {
-		val = r.Header.Get("X-Real-IP")
-		if len(val) > 0 {
-			return val
-		}
-	}
-	return r.RemoteAddr
-}
-
-func Values2JMap(values url.Values) JMap {
-	data := make(JMap)
-	for k, v := range values {
-		if len(v) == 1 {
-			data[k] = v[0]
-		} else if len(v) > 1 {
-			data[k] = v
-		}
-	}
-	return data
-}
-
-func ParseForm(r *http.Request) (data JMap, err error) {
-	ct := r.Header.Get("Content-Type")
-	if ct == "application/json" {
-		if r.Body == nil {
-			err = errors.New("missing json body")
-			return
-		}
-		var body []byte
-		if body, err = ioutil.ReadAll(r.Body); err != nil {
-			return
-		} else {
-			err = json.Unmarshal(body, &data)
-		}
-	} else if strings.HasPrefix(ct, "multipart/form-data") {
-		err = r.ParseMultipartForm(HttpEngine().MaxMultipartMemory)
-		if err != nil {
-			return
-		}
-		data = Values2JMap(r.MultipartForm.Value)
-	} else {
-		var f = ct != "application/x-www-form-urlencoded"
-		if f {
-			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		}
-		if err = r.ParseForm(); err != nil {
-			return
-		}
-		data = Values2JMap(r.PostForm)
-		if f {
-			r.Header.Set("Content-Type", ct)
-		}
-	}
-	return
-}
-
-func SetProcessName(name string) error {
-	argv0str := (*reflect.StringHeader)(unsafe.Pointer(&os.Args[0]))
-	argv0 := (*[1 << 30]byte)(unsafe.Pointer(argv0str.Data))[:argv0str.Len]
-	n := copy(argv0, name)
-	if n < len(argv0) {
-		argv0[n] = 0
-	}
-	// Syscall PRCTL, not working on Darwin for me
-	// bytes := append([]byte(name), 0)
-	// ptr := unsafe.Pointer(&bytes[0])
-	// if _, _, errno := syscall.RawSyscall6(syscall.SYS_PRCTL, syscall.PR_SET_NAME, uintptr(ptr), 0, 0, 0, 0); errno != 0 {
-	// 	return syscall.Errno(errno)
-	// }
-	return nil
-}
-
+// UnsafeStrToBytes 不安全的方式从string获取bytes，要确保string不会被释放
 func UnsafeStrToBytes(s string) []byte {
 	x := (*[2]uintptr)(unsafe.Pointer(&s))
 	h := [3]uintptr{x[0], x[1], x[1]}
 	return *(*[]byte)(unsafe.Pointer(&h))
 }
 
+// UnsafeBytesToStr 不安全方式从bytes获取string，要确保bytes不会被释放
 func UnsafeBytesToStr(b []byte) string {
 	return *(*string)(unsafe.Pointer(&b))
 }
 
+// NginxHash nginx的upstream指定的hash一致的算法
+// https://nginx.org/en/docs/http/ngx_http_upstream_module.html#hash
 func NginxHash(key string, num int) int {
 	return int((Crc32(key)>>16)&0x7fff) % num
 }
 
+// SafeGo 安全启动协程，panic时会告警，并且noPanic控制是否会panic
 func SafeGo(noPanic bool, f func()) {
 	go func() {
 		defer func() {

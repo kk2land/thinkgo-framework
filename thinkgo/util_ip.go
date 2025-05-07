@@ -7,6 +7,7 @@ import (
 
 var v4InV6Prefix = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff}
 
+// IsIPv4 判断是否是ipv4
 func IsIPv4(ip net.IP) bool {
 	if len(ip) == net.IPv4len {
 		return true

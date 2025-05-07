@@ -18,15 +18,18 @@ func initRedis() {
 	redis.SetLogger(&redisLogger{FieldLogger: Logger})
 }
 
-func RedisKeyNotExist(err error) bool {
+// RedisErrorKeyNotExist 判断redis的error是否是key不存在
+func RedisErrorKeyNotExist(err error) bool {
 	return errors.Is(err, redis.Nil)
 }
 
-func RedisNoErrOrKeyNotExist(err error) bool {
+// RedisErrorNilOrKeyNotExist 判断redis的error是否是nil或者key不存在
+func RedisErrorNilOrKeyNotExist(err error) bool {
 	return err == nil || errors.Is(err, redis.Nil)
 }
 
-func RedisErrRetry(err error) bool {
+// RedisErrorRetry 判断redis的error是否是可以重试的
+func RedisErrorRetry(err error) bool {
 	switch {
 	case err == io.EOF, errors.Is(err, io.ErrUnexpectedEOF):
 		return true
@@ -97,6 +100,7 @@ func redisCreate(name string) (interface{}, error) {
 	return db, nil
 }
 
+// RedisDefault 获取默认的redis操作对象
 func RedisDefault() (*RedisClient, error) {
 	redisDefaultOnce.Do(func() {
 		redisDefault, _ = Redis("default")
@@ -107,6 +111,7 @@ func RedisDefault() (*RedisClient, error) {
 	return nil, errors.New("redis[default] not exists")
 }
 
+// RedisDefaultOrPanic 获取默认的redis操作对象，否则panic
 func RedisDefaultOrPanic() *RedisClient {
 	if r, err := RedisDefault(); err != nil {
 		panic(err)
@@ -115,6 +120,7 @@ func RedisDefaultOrPanic() *RedisClient {
 	}
 }
 
+// Redis 获取指定name的redis操作对象
 func Redis(name string) (*RedisClient, error) {
 	obj, err := redisInstanceMap.LoadOrCreate(name)
 	if err != nil {
@@ -123,6 +129,7 @@ func Redis(name string) (*RedisClient, error) {
 	return obj.(*RedisClient), nil
 }
 
+// RedisOrPanic 获取指定name的redis操作对象，否则panic
 func RedisOrPanic(name string) *RedisClient {
 	if r, err := Redis(name); err != nil {
 		panic(err)
@@ -131,6 +138,7 @@ func RedisOrPanic(name string) *RedisClient {
 	}
 }
 
+// RedisCloseAll 关闭全部redis操作对象
 func RedisCloseAll() {
 	redisInstanceMap.Clear(func(name string, inst interface{}) {
 		if db, ok := inst.(*RedisClient); ok {

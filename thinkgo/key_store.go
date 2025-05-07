@@ -5,28 +5,28 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"github.com/VictoriaMetrics/fastcache"
-	"github.com/vmihailenco/msgpack/v5"
 	"sync"
 	"time"
 )
 
-// KeyStore，业务map，没有读取到则会从backend读取，同时set也会写入backend
-// todo 继续完善文档
-
+// KeyStoreDefaultCacheSize 默认的lru cache的大小
 var KeyStoreDefaultCacheSize = 1 * 1024 * 1024
 var keyStoreDefaultCacheOnce sync.Once
 var keyStoreDefaultCache *fastcache.Cache
 var keyStoreBigSize = 64 * 1024
 var keyStoreBigKeyMark byte = 255
 
+// KeyStoreMarshalJSON 将value进行序列化-json
 func KeyStoreMarshalJSON(v interface{}) ([]byte, error) {
 	return json.Marshal(v)
 }
 
-func KeyStoreMarshalMsgpack(v interface{}) ([]byte, error) {
-	return msgpack.Marshal(v)
-}
+// KeyStoreMarshalMsgpack 将value进行序列化-msgpack
+//func KeyStoreMarshalMsgpack(v interface{}) ([]byte, error) {
+//	return msgpack.Marshal(v)
+//}
 
+// KeyStoreUnmarshalJMap 将value进行反序列化-json
 func KeyStoreUnmarshalJMap(data []byte) (interface{}, error) {
 	var v JMap
 	err := json.Unmarshal(data, &v)
@@ -43,6 +43,7 @@ func keyStoreBigKey(key string) []byte {
 	return buf.Bytes()
 }
 
+// KeyStoreItem 存储到KeyStore中的元素
 type KeyStoreItem struct {
 	Key         string
 	Value       interface{}
@@ -50,10 +51,13 @@ type KeyStoreItem struct {
 	BackendSetF bool          //写入backend时，是否只在首次写入时，才设置过期时间
 }
 
+// KeyStoreMarshal 将value进行序列化的函数
 type KeyStoreMarshal func(v interface{}) ([]byte, error)
+
+// KeyStoreUnmarshal 将value进行反序列化的函数
 type KeyStoreUnmarshal func(data []byte) (interface{}, error)
 
-// KeyStore struct
+// KeyStore 业务缓存map，没有读取到则会从backend读取，同时set也会写入backend
 type KeyStore struct {
 	backend   KeyStoreBackend
 	marshal   KeyStoreMarshal
@@ -156,7 +160,7 @@ func (s *KeyStore) Load(key string) (interface{}, error) {
 	return val, nil
 }
 
-// LoadOrCreate 对于单个key来说，不保证事务，如果创建并不会写入backend中
+// LoadOrCreate 对于单个key来说，不保证事务，如果是创建并不会写入backend中
 func (s *KeyStore) LoadOrCreate(key string, f func(k string) interface{}) (value interface{}, loaded bool, err error) {
 	val, err := s.Load(key)
 	if err != nil {
@@ -199,10 +203,12 @@ func (s *KeyStore) Store(item *KeyStoreItem) error {
 	return s.backend.Set(item.Key, b, item.BackendTTL, item.BackendSetF)
 }
 
+// Lock 对某个key直接上内存锁
 func (s *KeyStore) Lock(key string, f func(value interface{}) bool) error {
 	return s.LockTimeout(key, 10*time.Second, f)
 }
 
+// LockTimeout 对某个key直接上内存锁，支持超时
 func (s *KeyStore) LockTimeout(key string, timeout time.Duration, f func(value interface{}) bool) error {
 	ret := KeyLockMemTimeout(key, timeout, func() interface{} {
 		val, err := s.Load(key)

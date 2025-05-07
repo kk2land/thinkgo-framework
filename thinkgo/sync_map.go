@@ -2,6 +2,7 @@ package thinkgo
 
 import "sync"
 
+// SyncMap 比sync.Map多了其他方法的并发map，性能没有sync.Map好
 type SyncMap struct {
 	m      sync.Map
 	mu     sync.Mutex

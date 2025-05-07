@@ -42,7 +42,7 @@ type DBInstance struct {
 	IsCluster bool
 }
 
-// ExecWithBackoff 带判断错误是可以重试的错误则会进行错误操作
+// ExecWithBackoff 带判断错误是可以重试的错误则会进行错误操作，函数f可以panic错误，或者return错误
 func (db *DBInstance) ExecWithBackoff(backoff BackoffPolicy, f func(*DBInstance) error) error {
 	cb := func() (err error) {
 		defer func() {

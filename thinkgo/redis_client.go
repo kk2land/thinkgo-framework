@@ -777,6 +777,7 @@ func (r *redisPrefixCmdable) PFMerge(ctx context.Context, dest string, keys ...s
 	return r.cmdable.PFMerge(ctx, r.k(dest), r.ks(keys)...)
 }
 
+// RedisClient redis操作对象，key均支持prefix
 type RedisClient struct {
 	redisCmdable
 	client    *redis.Client
@@ -793,6 +794,7 @@ func (r *RedisClient) Addr() string {
 	return r.client.Options().Addr
 }
 
+// Prefix 对于通过Raw()直接操作redis的方法，可以使用该方法来拼接prefix
 func (r *RedisClient) Prefix(key string) string {
 	if r.hasPrefix {
 		return r.prefix + key
@@ -801,6 +803,7 @@ func (r *RedisClient) Prefix(key string) string {
 	}
 }
 
+// Prefixes 批量拼接prefix
 func (r *RedisClient) Prefixes(keys []string) []string {
 	if r.hasPrefix {
 		for i := 0; i < len(keys); i++ {
@@ -810,6 +813,7 @@ func (r *RedisClient) Prefixes(keys []string) []string {
 	return keys
 }
 
+// Wait 等待redis ping成功
 func (r *RedisClient) Wait(backoff BackoffPolicy) bool {
 	for backoff.Next() {
 		if err := r.Raw().Ping(context.Background()).Err(); err == nil {
@@ -823,7 +827,8 @@ func (r *RedisClient) Wait(backoff BackoffPolicy) bool {
 	return false
 }
 
-func (r *RedisClient) Exec(backoff BackoffPolicy, f func() error) error {
+// ExecWithBackoff 带有重试功能的操作，函数f可以panic错误，或者return错误
+func (r *RedisClient) ExecWithBackoff(backoff BackoffPolicy, f func() error) error {
 	cb := func() (err error) {
 		defer func() {
 			if err1 := recover(); err1 != nil {
@@ -836,7 +841,7 @@ func (r *RedisClient) Exec(backoff BackoffPolicy, f func() error) error {
 	for backoff.Next() {
 		if err = cb(); err == nil {
 			return nil
-		} else if !RedisErrRetry(err) {
+		} else if !RedisErrorRetry(err) {
 			return err
 		} else if backoff.End() {
 			return err
@@ -846,6 +851,7 @@ func (r *RedisClient) Exec(backoff BackoffPolicy, f func() error) error {
 	return nil
 }
 
+// Raw 获取原始的redis对象
 func (r *RedisClient) Raw() *redis.Client {
 	return r.client
 }

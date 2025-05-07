@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-// TimeoutOnce，带有超时的once
-
+// TimeoutOnce 带有超时的once
 type TimeoutOnce struct {
 	done  chan Void
 	state int32
@@ -26,7 +25,7 @@ func (once *TimeoutOnce) Do(f func()) {
 	<-once.done
 }
 
-func (once *TimeoutOnce) Do1(timeout time.Duration, f func()) bool {
+func (once *TimeoutOnce) DoTimeout(timeout time.Duration, f func()) bool {
 	if atomic.CompareAndSwapInt32(&once.state, 0, 1) {
 		once.doSlow(f)
 	}

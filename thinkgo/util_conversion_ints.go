@@ -7,6 +7,7 @@ import (
 	"strconv"
 )
 
+// ConversionInts json/xorm的int数组，格式：[int1, int2, ...] or "int1,int2,int3"
 type ConversionInts []int
 
 func (c *ConversionInts) UnmarshalJSON(b []byte) error {

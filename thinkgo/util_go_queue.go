@@ -5,8 +5,7 @@ import (
 	"sync/atomic"
 )
 
-// 将一些不重要需要上锁的操作改成使用go + channel的方式
-
+// GoQueue 将一些不重要需要上锁的操作改成使用go + channel的方式
 type GoQueue struct {
 	ch      chan interface{}
 	state   int32

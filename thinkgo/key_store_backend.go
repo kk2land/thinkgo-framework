@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// KeyStoreBackend KeyStore所需的持久化对象
 type KeyStoreBackend interface {
 	Get(key string) ([]byte, error)
 	Set(key string, value []byte, ttl time.Duration, setf bool) error
@@ -64,6 +65,7 @@ type keyStoreBackendAsync struct {
 	flushQueue      *GoQueue
 }
 
+// NewKeyStoreBackendAsync 异步写入backend的KeyStoreBackend
 func NewKeyStoreBackendAsync(
 	name string,
 	flushPeriod time.Duration,
