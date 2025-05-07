@@ -22,17 +22,29 @@ WsEventRouterRegister(path string, *WsEventRouterOption) WsEventRouter
 */
 
 const (
-	WsEventErrTypeOpenFail   = 1
-	WsEventErrTypeStartFail  = 2
-	WsEventErrTypeNotfound   = 3
+	// WsEventErrTypeOpenFail WsEventRouterOption.ErrorHandler的errorType，OpenHandler返回的错误
+	WsEventErrTypeOpenFail = 1
+	// WsEventErrTypeStartFail CtxConnStartHandler panic的错误
+	WsEventErrTypeStartFail = 2
+	// WsEventErrTypeNotfound event对应的handler找不到
+	WsEventErrTypeNotfound = 3
+	// WsEventErrTypeEventPanic event处理的handler panic的错误
 	WsEventErrTypeEventPanic = 4
 )
 
+// WsEventErrorNoConn 写消息到客户端是，没有链接alive
 var WsEventErrorNoConn = errors.New("no conn")
+
+// WsEventConnIdleTimeout 客户端超过多少秒没有消息过来，则关闭客户端连接
 var WsEventConnIdleTimeout = 300 * time.Second
+
+// WsEventReadChannelSizeDefault 接收客户端消息的channel默认size
 var WsEventReadChannelSizeDefault = 1
+
+// WsEventWriteChannelSizeDefault 发送客户端消息的channel默认size
 var WsEventWriteChannelSizeDefault = 10
 
+// WsEventMessage event消息
 type WsEventMessage struct {
 	Event   string
 	Message []byte
