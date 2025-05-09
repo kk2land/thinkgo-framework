@@ -208,15 +208,24 @@ func SafeGo(noPanic bool, f func()) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				if !noPanic {
-					OpsAlarm("%s 协程panic退出-%v", AppName, r)
+				//如果send一个已经被关闭的channel，则只是写错误日志
+				if err, ok := r.(error); ok && err.Error() == "send on closed channel" {
+					Logger.Error(err.Error())
 					stack := Stack(3, 5)
 					Logger.Errorf("stack=%s", stack)
-					panic(r)
 				} else {
-					OpsAlarm("%s 协程panic错误-%v", AppName, r)
+					var hit string
+					if noPanic {
+						hit = "错误"
+					} else {
+						hit = "退出"
+					}
+					OpsAlarm("%s 协程panic%s-%v", AppName, hit, r)
 					stack := Stack(3, 5)
 					Logger.Errorf("stack=%s", stack)
+					if !noPanic {
+						panic(r)
+					}
 				}
 			}
 		}()
