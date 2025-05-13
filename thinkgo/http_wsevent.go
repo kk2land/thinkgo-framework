@@ -32,8 +32,8 @@ const (
 	WsEventErrTypeEventPanic = 4
 )
 
-// WsEventErrorNoConn 写消息到客户端是，没有链接alive
-var WsEventErrorNoConn = errors.New("no conn")
+// WsEventErrNoConn 写消息到客户端是，没有链接alive
+var WsEventErrNoConn = errors.New("no conn")
 
 // WsEventConnIdleTimeout 客户端超过多少秒没有消息过来，则关闭客户端连接
 var WsEventConnIdleTimeout = 300 * time.Second

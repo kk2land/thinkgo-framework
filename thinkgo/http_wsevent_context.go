@@ -165,7 +165,7 @@ loop:
 			case *WsEventMessage:
 				var err error = nil
 				if conn == nil {
-					err = WsEventErrorNoConn
+					err = WsEventErrNoConn
 				} else if err = wsEventMessageWrite(conn, d); err != nil {
 					_ = conn.Close()
 					conn = nil

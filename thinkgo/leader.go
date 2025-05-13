@@ -122,7 +122,7 @@ end
 	ttl := 15
 	call := func() {
 		cmd := l.client.Raw().EvalSha(ctx, scriptSha1, []string{key}, token, ttl)
-		if !RedisErrorNilOrKeyNotExist(cmd.Err()) {
+		if !RedisErrNilOrKeyNotExist(cmd.Err()) {
 			OpsAlarm("LeaderRedis(%s)EvalSha错误=%s,sha1=%s", l.name, cmd.Err(), scriptSha1)
 		} else if ret, err := cmd.Int(); err != nil {
 			OpsAlarm("LeaderRedis(%s)EvalSha返回不是int=%s", l.name, cmd.Val())

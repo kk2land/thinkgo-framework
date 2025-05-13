@@ -23,8 +23,8 @@ func RedisErrorKeyNotExist(err error) bool {
 	return errors.Is(err, redis.Nil)
 }
 
-// RedisErrorNilOrKeyNotExist 判断redis的error是否是nil或者key不存在
-func RedisErrorNilOrKeyNotExist(err error) bool {
+// RedisErrNilOrKeyNotExist 判断redis的error是否是nil或者key不存在
+func RedisErrNilOrKeyNotExist(err error) bool {
 	return err == nil || errors.Is(err, redis.Nil)
 }
 
