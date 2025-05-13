@@ -90,18 +90,7 @@ func HttpGet(url string) (int, []byte, error) {
 	if err != nil {
 		return -1, nil, err
 	}
-	var resp *http.Response
-	if resp, err = HttpRequest(req); err != nil {
-		return -1, nil, err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	var body []byte
-	if body, err = ioutil.ReadAll(resp.Body); err != nil {
-		return -1, nil, err
-	}
-	return resp.StatusCode, body, nil
+	return HttpBody(req)
 }
 
 // HttpPost 简化http-post请求
@@ -110,19 +99,7 @@ func HttpPost(url, contentType string, body io.Reader) (int, []byte, error) {
 	if err != nil {
 		return -1, nil, err
 	}
-	req.Header.Set("Content-Type", contentType)
-	var resp *http.Response
-	if resp, err = HttpRequest(req); err != nil {
-		return -1, nil, err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	var rbody []byte
-	if rbody, err = ioutil.ReadAll(resp.Body); err != nil {
-		return -1, nil, err
-	}
-	return resp.StatusCode, rbody, nil
+	return HttpBody(req)
 }
 
 // HttpPostForm 简化http-post提交form表单格式请求
@@ -136,42 +113,34 @@ func HttpBody(req *http.Request) (int, []byte, error) {
 }
 
 // HttpBodyWithTries 发起http请求，需要返回body内容，支持重试
-func HttpBodyWithTries(req *http.Request, timeout time.Duration, backoff BackoffPolicy) (int, []byte, error) {
-	resp, err := HttpRequestWithTries(req, timeout, backoff)
-	if err != nil {
-		return -1, nil, err
+func HttpBodyWithTries(req *http.Request, timeout time.Duration, backoff BackoffPolicy) (code int, body []byte, err error) {
+	read := func(req *http.Request) (int, []byte, error) {
+		resp, err1 := http.DefaultClient.Do(req)
+		if err1 != nil {
+			return -1, nil, err1
+		}
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		var body1 []byte
+		if body1, err1 = ioutil.ReadAll(resp.Body); err1 != nil {
+			return -1, nil, err1
+		}
+		return resp.StatusCode, body1, nil
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	var rbody []byte
-	if rbody, err = ioutil.ReadAll(resp.Body); err != nil {
-		return -1, nil, err
-	}
-	return resp.StatusCode, rbody, nil
-}
 
-// HttpRequest 发起http请求，直接返回http.Response
-func HttpRequest(req *http.Request) (*http.Response, error) {
-	return HttpRequestWithTries(req, 5*time.Second, BackoffPolicyDefault(time.Millisecond, 1))
-}
-
-// HttpRequestWithTries 发起http请求，直接返回http.Response，支持重试
-func HttpRequestWithTries(req *http.Request, timeout time.Duration, backoff BackoffPolicy) (*http.Response, error) {
-	var resp *http.Response
-	var err error
 	for backoff.Next() {
-		resp, err = func() (*http.Response, error) {
+		code, body, err = func() (int, []byte, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
-			return http.DefaultClient.Do(req.WithContext(ctx))
+			return read(req.WithContext(ctx))
 		}()
 		if err == nil {
-			return resp, nil
+			return
 		} else if backoff.End() {
 			break
 		}
 		time.Sleep(backoff.Get())
 	}
-	return nil, err
+	return
 }
