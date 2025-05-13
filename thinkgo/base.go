@@ -91,9 +91,6 @@ func init() {
 		AppStatus = envAppStatus
 		AppDebug = !strings.HasPrefix(AppStatus, "prod")
 	}
-	if envAppDebug := os.Getenv(envKeyAppDebug); len(envAppDebug) > 0 {
-		AppDebug = envAppDebug == "1"
-	}
 
 	if Hostname, err = os.Hostname(); err != nil {
 		panic(err)
@@ -108,6 +105,10 @@ func init() {
 	if Config.AppDebug {
 		AppDebug = Config.AppDebug
 	}
+	if envAppDebug := os.Getenv(envKeyAppDebug); len(envAppDebug) > 0 {
+		AppDebug = envAppDebug == "1"
+	}
+
 	if InModule {
 		AppName = Config.AppName + "-" + ModuleName
 	} else {
