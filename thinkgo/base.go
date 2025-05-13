@@ -20,6 +20,7 @@ import (
 const (
 	envKeyRootPath         = "_TK_RootPath"
 	envKeyAppStatus        = "_TK_AppStatus"
+	envKeyAppDebug         = "_TK_AppDebug"
 	envKeyInternalHttpPort = "_TK_Internal_HttpPort"
 	envKeyLogConsole       = "_TK_LogConsole"
 
@@ -86,10 +87,12 @@ func init() {
 		}
 	}
 
-	envAppStatus := os.Getenv(envKeyAppStatus)
-	if len(envAppStatus) > 0 {
+	if envAppStatus := os.Getenv(envKeyAppStatus); len(envAppStatus) > 0 {
 		AppStatus = envAppStatus
 		AppDebug = !strings.HasPrefix(AppStatus, "prod")
+	}
+	if envAppDebug := os.Getenv(envKeyAppDebug); len(envAppDebug) > 0 {
+		AppDebug = envAppDebug == "1"
 	}
 
 	if Hostname, err = os.Hostname(); err != nil {
