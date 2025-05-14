@@ -17,7 +17,7 @@ func (i *cMapLRUShardItem[T]) expired() bool {
 }
 
 type CMapLRUShard[T any] struct {
-	sync.Mutex
+	lock  sync.Mutex
 	idx   int
 	cache *lru.Cache
 	ttl   time.Duration
@@ -28,14 +28,15 @@ func (s *CMapLRUShard[T]) Index() int {
 }
 
 func (s *CMapLRUShard[T]) Store(key string, value T) {
-	s.Lock()
-	defer s.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.cache.Add(key, &cMapLRUShardItem[T]{v: value, expireAt: time.Now().Add(s.ttl)})
 }
 
+// Storef 如果存在则不更新ttl
 func (s *CMapLRUShard[T]) Storef(key string, value T) {
-	s.Lock()
-	defer s.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	if val, ok := s.cache.Get(key); ok {
 		val.(*cMapLRUShardItem[T]).v = value
 	} else {
@@ -44,8 +45,8 @@ func (s *CMapLRUShard[T]) Storef(key string, value T) {
 }
 
 func (s *CMapLRUShard[T]) Load(key string) (T, bool) {
-	s.Lock()
-	defer s.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	if val, ok := s.cache.Get(key); ok {
 		item := val.(*cMapLRUShardItem[T])
 		if !item.expired() {
@@ -58,8 +59,8 @@ func (s *CMapLRUShard[T]) Load(key string) (T, bool) {
 }
 
 func (s *CMapLRUShard[T]) LoadOrStore(key string, value T) (T, bool) {
-	s.Lock()
-	defer s.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	val, ok := s.cache.Get(key)
 	if ok {
 		item := val.(*cMapLRUShardItem[T])
@@ -71,9 +72,9 @@ func (s *CMapLRUShard[T]) LoadOrStore(key string, value T) (T, bool) {
 	return value, false
 }
 
-func (s *CMapLRUShard[T]) LoadOrCreate(key string, f func(k string) T) (T, bool) {
-	s.Lock()
-	defer s.Unlock()
+func (s *CMapLRUShard[T]) LoadOrCreate(key string, create func(k string) T) (T, bool) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	obj, ok := s.cache.Get(key)
 	if ok {
 		item := obj.(*cMapLRUShardItem[T])
@@ -81,31 +82,21 @@ func (s *CMapLRUShard[T]) LoadOrCreate(key string, f func(k string) T) (T, bool)
 			return item.v, true
 		}
 	}
-	val := f(key)
+	val := create(key)
 	s.cache.Add(key, &cMapLRUShardItem[T]{v: val, expireAt: time.Now().Add(s.ttl)})
 	return val, false
 }
 
-func (s *CMapLRUShard[T]) LoadOrCreateCb(key string, f func(k string) T, cb func(val T, loaded bool)) {
-	s.Lock()
-	defer s.Unlock()
-	obj, ok := s.cache.Get(key)
-	if ok {
-		item := obj.(*cMapLRUShardItem[T])
-		if !item.expired() {
-			cb(item.v, false)
-			return
-		}
-	}
-	val := f(key)
-	s.cache.Add(key, &cMapLRUShardItem[T]{v: val, expireAt: time.Now().Add(s.ttl)})
-	cb(val, true)
+func (s *CMapLRUShard[T]) Delete(key string) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.cache.Remove(key)
 }
 
-func (s *CMapLRUShard[T]) Delete(key string) {
-	s.Lock()
-	defer s.Unlock()
-	s.cache.Remove(key)
+func (s *CMapLRUShard[T]) Lock(f func(*lru.Cache)) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	f(s.cache)
 }
 
 // CMapLRU 带有LRU功能的并发map
@@ -114,11 +105,11 @@ type CMapLRU[T any] struct {
 	shardsCount uint32
 }
 
-func CMapLRUNew[T any](size int, ttl time.Duration) *CMapLRU[T] {
-	return CMapLRUNew1[T](CMapShardsCountDefault, size, ttl)
+func NewCMapLRU[T any](size int, ttl time.Duration) *CMapLRU[T] {
+	return NewCMapLRUWithCount[T](CMapShardsCountDefault, size, ttl)
 }
 
-func CMapLRUNew1[T any](shardsCount int, size int, ttl time.Duration) *CMapLRU[T] {
+func NewCMapLRUWithCount[T any](shardsCount int, size int, ttl time.Duration) *CMapLRU[T] {
 	shards := make([]*CMapLRUShard[T], shardsCount)
 	shardSize := int(math.Max(10.0, float64(size/shardsCount)))
 	for i := 0; i < shardsCount; i++ {
@@ -151,8 +142,8 @@ func (m *CMapLRU[T]) LoadOrStore(key string, value T) (val T, loaded bool) {
 	return m.GetShard(key).LoadOrStore(key, value)
 }
 
-func (m *CMapLRU[T]) LoadOrCreate(key string, f func(k string) T) (val T, loaded bool) {
-	return m.GetShard(key).LoadOrCreate(key, f)
+func (m *CMapLRU[T]) LoadOrCreate(key string, create func(k string) T) (val T, loaded bool) {
+	return m.GetShard(key).LoadOrCreate(key, create)
 }
 
 func (m *CMapLRU[T]) Delete(key string) {

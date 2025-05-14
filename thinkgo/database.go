@@ -31,7 +31,7 @@ func DBErrRetry(err error) bool {
 	return false
 }
 
-var dbInstanceMap = NewInstanceMap(dbCreate)
+var dbInstanceMap = NewSyncMap(dbCreate)
 var dbInstanceDefault *DBInstance
 var dbInstanceOnce sync.Once
 
@@ -81,7 +81,7 @@ func (db *DBInstance) Close() (err error) {
 	return
 }
 
-func dbCreate(name string) (interface{}, error) {
+func dbCreate(name string) (*DBInstance, error) {
 	var config dbConfig
 	var ok bool
 	if config, ok = Config.DB[name]; !ok {
@@ -151,14 +151,10 @@ func DBDefaultOrPanic() *DBInstance {
 
 // DB 基于name获取数据库操作对象
 func DB(name string) (*DBInstance, error) {
-	obj, err := dbInstanceMap.LoadOrCreate(name)
-	if err != nil {
-		return nil, err
-	}
-	return obj.(*DBInstance), nil
+	return dbInstanceMap.LoadOrCreate(name)
 }
 
-// DB 基于name获取数据库操作对象，否则panic
+// DBOrPanic 基于name获取数据库操作对象，否则panic
 func DBOrPanic(name string) *DBInstance {
 	if d, err := DB(name); err != nil {
 		panic(err)
@@ -169,19 +165,15 @@ func DBOrPanic(name string) *DBInstance {
 
 // DBCloseAll 关闭全部数据对象
 func DBCloseAll() {
-	dbInstanceMap.Clear(func(name string, inst interface{}) {
+	dbInstanceMap.Clear(func(name string, db *DBInstance) {
 		var err error
-		if db, ok := inst.(*DBInstance); ok {
-			if db.IsCluster {
-				eg := db.EngineInterface.(*xorm.EngineGroup)
-				err = eg.Close()
-			} else {
-				e := db.EngineInterface.(*xorm.Engine)
-				err = e.Close()
-			}
-			if err != nil {
-				Logger.Errorf("[DBCloseAll]close db[%s] fail - %s", db.Name, err.Error())
-			}
+		if db.IsCluster {
+			err = (db.EngineInterface.(*xorm.EngineGroup)).Close()
+		} else {
+			err = (db.EngineInterface.(*xorm.Engine)).Close()
+		}
+		if err != nil {
+			Logger.Errorf("[DBCloseAll]close db[%s] fail - %s", db.Name, err.Error())
 		}
 	})
 }

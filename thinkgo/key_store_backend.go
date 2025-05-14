@@ -56,7 +56,7 @@ type keyStoreBackendAsyncItem struct {
 type keyStoreBackendAsync struct {
 	KeyStoreBackend
 	logger          FieldLogger
-	changes         *CMap[interface{}]
+	changes         *CMap[string, interface{}]
 	flushOnce       sync.Once
 	flushPeriod     time.Duration
 	flushMaxSize    uint64
@@ -75,7 +75,7 @@ func NewKeyStoreBackendAsync(
 	b := &keyStoreBackendAsync{
 		KeyStoreBackend: backend,
 		logger:          Logger.With("keyStoreBackendAsync", name),
-		changes:         CMapNew[interface{}](),
+		changes:         NewCMapString[interface{}](),
 		flushPeriod:     flushPeriod,
 		flushMaxSize:    uint64(flushMaxSize),
 		flushSetCounter: 0,

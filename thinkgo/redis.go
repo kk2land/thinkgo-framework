@@ -10,7 +10,7 @@ import (
 	"sync"
 )
 
-var redisInstanceMap = NewInstanceMap(redisCreate)
+var redisInstanceMap = NewSyncMap(redisCreate)
 var redisDefault *RedisClient
 var redisDefaultOnce sync.Once
 
@@ -59,7 +59,7 @@ func RedisErrorRetry(err error) bool {
 	return false
 }
 
-func redisCreate(name string) (interface{}, error) {
+func redisCreate(name string) (*RedisClient, error) {
 	var config redisConfig
 	var ok bool
 	if config, ok = Config.Redis[name]; !ok {
@@ -122,11 +122,7 @@ func RedisDefaultOrPanic() *RedisClient {
 
 // Redis 获取指定name的redis操作对象
 func Redis(name string) (*RedisClient, error) {
-	obj, err := redisInstanceMap.LoadOrCreate(name)
-	if err != nil {
-		return nil, err
-	}
-	return obj.(*RedisClient), nil
+	return redisInstanceMap.LoadOrCreate(name)
 }
 
 // RedisOrPanic 获取指定name的redis操作对象，否则panic
@@ -140,11 +136,9 @@ func RedisOrPanic(name string) *RedisClient {
 
 // RedisCloseAll 关闭全部redis操作对象
 func RedisCloseAll() {
-	redisInstanceMap.Clear(func(name string, inst interface{}) {
-		if db, ok := inst.(*RedisClient); ok {
-			if err := db.close(); err != nil {
-				Logger.Errorf("[RedisCloseAll]close redis[%s] fail - %s", db.name, err.Error())
-			}
+	redisInstanceMap.Clear(func(name string, obj *RedisClient) {
+		if err := obj.close(); err != nil {
+			Logger.Errorf("[RedisCloseAll]close redis[%s] fail - %s", obj.name, err.Error())
 		}
 	})
 }

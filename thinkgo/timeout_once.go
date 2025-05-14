@@ -11,7 +11,7 @@ type TimeoutOnce struct {
 	state int32
 }
 
-func TimeoutOnceNew() *TimeoutOnce {
+func NewTimeoutOnce() *TimeoutOnce {
 	return &TimeoutOnce{
 		done:  make(chan Void),
 		state: 0,

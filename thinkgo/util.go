@@ -15,10 +15,10 @@ import (
 	"unsafe"
 )
 
-// TimeFormatYmd 时间格式 = Y-m-d
+// TimeFormatYmd 时间格式 = Y-items-d
 var TimeFormatYmd = "2006-01-02"
 
-// TimeFormatYmdHis 时间格式 = Y-m-d H:i:s
+// TimeFormatYmdHis 时间格式 = Y-items-d H:i:s
 var TimeFormatYmdHis = "2006-01-02 15:04:05"
 
 // BytesBuffer1024 共用的内存池

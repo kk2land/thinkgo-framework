@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	envKeyRootPath         = "_TK_RootPath"
-	envKeyAppStatus        = "_TK_AppStatus"
-	envKeyAppDebug         = "_TK_AppDebug"
-	envKeyInternalHttpPort = "_TK_Internal_HttpPort"
-	envKeyLogConsole       = "_TK_LogConsole"
+	envKeyRootPath         = "_TK_RootPath"          // go run时，设置使用
+	envKeyAppStatus        = "_TK_AppStatus"         // 环境配置加载
+	envKeyAppDebug         = "_TK_AppDebug"          // '1'则开启debug模式
+	envKeyInternalHttpPort = "_TK_Internal_HttpPort" // http服务内部使用，对于随机的端口，reload后保持端口不变
+	envKeyLogConsole       = "_TK_LogConsole"        // '1'则直接将日志输出到屏幕上
 
 	CommandNameHttp  = "http"  //二进制命令名-http
 	CommandNameGrpc  = "grpc"  //二进制命令-grpc

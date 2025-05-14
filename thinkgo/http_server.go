@@ -144,7 +144,6 @@ func HttpStartServer() {
 	} else {
 		handler = HttpEngine()
 	}
-	AddShutdownHook(wsEventClose)
 	StartHttpServer(
 		port,
 		h2c.NewHandler(handler, &http2.Server{}),

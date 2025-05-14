@@ -31,7 +31,7 @@ type LeaderRedis struct {
 	stateCh      chan Void
 }
 
-func LeaderRedisNew(name string, id int, client *RedisClient) *LeaderRedis {
+func NewLeaderRedis(name string, id int, client *RedisClient) *LeaderRedis {
 	return &LeaderRedis{
 		name:    name,
 		id:      id,

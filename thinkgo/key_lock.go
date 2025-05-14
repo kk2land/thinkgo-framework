@@ -22,7 +22,7 @@ func KeyLockErrLockedFail(err interface{}) bool {
 }
 
 // KeyLockMem start
-var keyLockMemMap = CMapNew[interface{}]()
+var keyLockMemMap = NewCMapString[interface{}]()
 
 type keyLockMemItem struct {
 	ch      chan struct{}
@@ -57,7 +57,7 @@ func KeyLockMemTry(key string, f KeyLockHandler) (obj interface{}, locked bool) 
 func KeyLockMemTimeout(key string, timeout time.Duration, f KeyLockHandler) interface{} {
 	var item *keyLockMemItem
 	shard := keyLockMemMap.GetShard(key)
-	shard.LoadOrCreateCb(key, keyLockMemItemNew, func(val interface{}, loaded bool) {
+	shard.LoadOrCreateF(key, keyLockMemItemNew, func(val interface{}, loaded bool) {
 		item = val.(*keyLockMemItem)
 		if loaded {
 			atomic.AddInt32(&item.counter, 1)
@@ -67,13 +67,13 @@ func KeyLockMemTimeout(key string, timeout time.Duration, f KeyLockHandler) inte
 	var locked = false
 	defer func() {
 		if atomic.AddInt32(&item.counter, -1) == 0 {
-			shard.Lock()
-			if atomic.LoadInt32(&item.counter) == 0 {
-				delete(shard.Items(), key)
-			} else if locked {
-				item.ch <- struct{}{}
-			}
-			shard.Unlock()
+			shard.Lock(func(items map[string]interface{}) {
+				if atomic.LoadInt32(&item.counter) == 0 {
+					delete(items, key)
+				} else if locked {
+					item.ch <- struct{}{}
+				}
+			})
 		} else if locked {
 			item.ch <- struct{}{}
 		}
@@ -209,11 +209,15 @@ func (l *KeyLockMySQL) LockTry(key string, f KeyLockHandler) (obj interface{}, l
 // LockTimeout 参数timeout会int(timeout.Seconds())，向下取整1秒
 func (l *KeyLockMySQL) LockTimeout(key string, timeout time.Duration, f KeyLockHandler) interface{} {
 	sess := l.Client.NewSession()
-	defer sess.Close()
+	defer func() {
+		_ = sess.Close()
+	}()
 	if err := sess.Begin(); err != nil {
 		panic(err)
 	}
-	defer sess.Commit()
+	defer func() {
+		_ = sess.Commit()
+	}()
 	key = keyLockMySQLPrefix + key
 	res, err := sess.QueryString("select GET_LOCK(?, ?) as l", key, int(timeout.Seconds()))
 	if err != nil {
