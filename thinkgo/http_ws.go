@@ -349,11 +349,18 @@ type HttpWsRouter struct {
 }
 
 func NewHttpWsRouter(handler HttpWsHandler) *HttpWsRouter {
-	return &HttpWsRouter{
+	router := &HttpWsRouter{
 		handler:  handler,
 		conns:    NewCMapUint64[*HttpWsConn](),
 		keyConns: NewCMapString[*HttpWsConn](),
 	}
+	AddShutdownHook(func(wait *sync.WaitGroup) {
+		router.conns.Range(func(k uint64, v *HttpWsConn) bool {
+			v.Close()
+			return true
+		})
+	})
+	return router
 }
 
 func (m *HttpWsRouter) closeConn(key string, wsConn *HttpWsConn) {
