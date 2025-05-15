@@ -1,5 +1,6 @@
 package thinkgo
 
+import "C"
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -202,8 +203,10 @@ func (m *HttpWsConn) start() {
 			select {
 			case data := <-m.closeChannel:
 				if data == nil {
+					m.logger.Infof("正常退出")
 					m.router.handler.OnClose(m, HttpWsConnCloseFromNormal, nil, writeNoNetErr)
 				} else {
+					m.logger.Warnf("异常退出-%d,%v", data.from, data.err)
 					switch data.from {
 					// 以下close类型，在关闭前可以发送数据到客户端
 					case HttpWsConnCloseFromConnectErr,
@@ -244,6 +247,7 @@ func (m *HttpWsConn) start() {
 				}
 			}
 		}
+		m.logger.Infof("开始退出write协程,key=%s", key)
 		//启动一个协程来消耗writeChannel/controlChannel
 		go func() {
 			for {
@@ -272,6 +276,7 @@ func (m *HttpWsConn) start() {
 		//将wsConn从router中移除
 		m.router.closeConn(key, m)
 		_ = m.conn.Close()
+		m.logger.Infof("结束退出write协程,key=%s", key)
 	}()
 }
 
@@ -412,6 +417,7 @@ func (m *HttpWsRouter) KeyConnBind(key string, wsConn *HttpWsConn, replace bool)
 			}
 		}
 	})
+	wsConn.logger.Infof("绑定key-%s,%t", key, swapped)
 	return
 }
 
@@ -433,7 +439,7 @@ func (m *HttpWsRouter) Handle(c *gin.Context, onMessage func(wsConn *HttpWsConn,
 	}
 	conn, err := up.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		logger.Errorf("upgrade fail - %s", err)
+		logger.Errorf("Upgrade fail - %s", err)
 		return err
 	}
 	if err = conn.SetReadDeadline(time.Now().Add(httpWsConnReadDeadline)); err != nil {
@@ -445,13 +451,14 @@ func (m *HttpWsRouter) Handle(c *gin.Context, onMessage func(wsConn *HttpWsConn,
 	})
 
 	wsConn := newHttpWsConn(logger, m, c, conn)
+	m.conns.Store(wsConn.connId, wsConn)
 	wsConn.start()
 	if err = m.handler.OnConnect(c, wsConn); err != nil {
 		wsConn.close(HttpWsConnCloseFromConnectErr, err)
 		return err
 	}
-	m.conns.Store(wsConn.connId, wsConn)
 
+	wsConn.logger.Infof("开始ReadMessage")
 	var b []byte
 	var msg interface{}
 	for {
