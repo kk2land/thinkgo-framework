@@ -21,20 +21,6 @@ const (
 	HttpWsConnCloseFromKeyReplace        // HttpWsConn因为相同key被顶掉导致退出
 )
 
-// HttpWsHandler HttpWsRouter需要的一些处理配置
-type HttpWsHandler interface {
-	// WriteChannelSize 写channel的容量
-	WriteChannelSize() int
-	// OnConnect 在http请求协程中调用
-	OnConnect(c *gin.Context, wsConn *HttpWsConn) error
-	// OnClose 确保只在write协程中调用
-	OnClose(wsConn *HttpWsConn, from int, err error, writeNoNetErr func([]byte))
-	// Marshal 序列化消息
-	Marshal(msg interface{}) ([]byte, error)
-	// Unmarshal 反序列化消息
-	Unmarshal(b []byte) (interface{}, error)
-}
-
 type HttpWsConnOnMessage func(wsConn *HttpWsConn, msg interface{}) error
 
 type HttpWsConnOnClose func(wsConn *HttpWsConn, from int, err error, writeNoNetErr func([]byte))
