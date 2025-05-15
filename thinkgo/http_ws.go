@@ -348,7 +348,7 @@ type HttpWsRouter struct {
 	keyConns *CMap[string, *HttpWsConn]
 }
 
-func NewHttpWsHandler(handler HttpWsHandler) *HttpWsRouter {
+func NewHttpWsRouter(handler HttpWsHandler) *HttpWsRouter {
 	return &HttpWsRouter{
 		handler:  handler,
 		conns:    NewCMapUint64[*HttpWsConn](),
