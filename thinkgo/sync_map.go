@@ -1,6 +1,8 @@
 package thinkgo
 
-import "sync"
+import (
+	"sync"
+)
 
 // SyncMap 比sync.Map多了其他方法的并发map，性能没有sync.Map好
 type SyncMap[T any] struct {
@@ -13,6 +15,10 @@ func NewSyncMap[T any](create func(key string) (T, error)) *SyncMap[T] {
 	return &SyncMap[T]{
 		create: create,
 	}
+}
+
+func (m *SyncMap[T]) Load(key string) (T, bool) {
+	return m.items.Load(key)
 }
 
 func (m *SyncMap[T]) LoadOrCreate(key string) (T, error) {
