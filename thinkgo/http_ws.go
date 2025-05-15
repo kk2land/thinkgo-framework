@@ -22,6 +22,20 @@ const (
 	HttpWsConnCloseFromKeyReplace        // HttpWsConn因为相同key被顶掉导致退出
 )
 
+// HttpWsHandler HttpWsRouter需要的一些处理配置
+type HttpWsHandler interface {
+	// WriteChannelSize 写channel的容量
+	WriteChannelSize() int
+	// OnConnect 在http请求协程中调用
+	OnConnect(c *gin.Context, wsConn *HttpWsConn) error
+	// OnClose 确保只在write协程中调用
+	OnClose(wsConn *HttpWsConn, from int, err error, writeNoNetErr func([]byte))
+	// Marshal 序列化消息
+	Marshal(msg interface{}) ([]byte, error)
+	// Unmarshal 反序列化消息
+	Unmarshal(b []byte) (interface{}, error)
+}
+
 var httpWsConnIdCounter atomic.Uint64
 var httpWsConnGroupIdCounter atomic.Uint64
 var httpWsConnPingInterval = 15 * time.Second
@@ -330,20 +344,6 @@ func (m *HttpWsConnGroup) TryWrite(b []byte) {
 		wsConn.TryWriteBytes(b)
 		return true
 	})
-}
-
-// HttpWsHandler HttpWsRouter需要的一些处理配置
-type HttpWsHandler interface {
-	// WriteChannelSize 写channel的容量
-	WriteChannelSize() int
-	// OnConnect 在http请求协程中调用
-	OnConnect(c *gin.Context, wsConn *HttpWsConn) error
-	// OnClose 确保只在write协程中调用
-	OnClose(wsConn *HttpWsConn, from int, err error, writeNoNetErr func([]byte))
-	// Marshal 序列化消息
-	Marshal(msg interface{}) ([]byte, error)
-	// Unmarshal 反序列化消息
-	Unmarshal(b []byte) (interface{}, error)
 }
 
 // HttpWsRouter 在http的handler中升级成websocket的封装
