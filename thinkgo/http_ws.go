@@ -13,7 +13,6 @@ import (
 
 const (
 	HttpWsConnCloseFromNormal     = iota // HttpWsConn正常退出
-	HttpWsConnCloseFromConnectErr        // HttpWsConn因为onConnect错误导致退出
 	HttpWsConnCloseFromWriteErr          // HttpWsConn写错误导致退出
 	HttpWsConnCloseFromReadErr           // HttpWsConn读错误导致退出
 	HttpWsConnCloseFromMessageErr        // HttpWsConn的onMessage错误导致退出
@@ -36,6 +35,10 @@ type HttpWsHandler interface {
 	Unmarshal(b []byte) (interface{}, error)
 }
 
+type HttpWsConnOnMessage func(wsConn *HttpWsConn, msg interface{}) error
+
+type HttpWsConnOnClose func(wsConn *HttpWsConn, from int, err error, writeNoNetErr func([]byte))
+
 var httpWsConnIdCounter atomic.Uint64
 var httpWsConnGroupIdCounter atomic.Uint64
 var httpWsConnPingInterval = 15 * time.Second
@@ -55,6 +58,12 @@ type httpWsConnControlKeyData struct {
 	key string
 }
 
+func httpWsConnOnMessage(wsConn *HttpWsConn, msg interface{}) error {
+	return nil
+}
+
+func httpWsConnOnClose(wsConn *HttpWsConn, from int, err error, writeNoNetErr func([]byte)) {}
+
 // HttpWsConn 封装的websocket connection
 type HttpWsConn struct {
 	logger         FieldLogger
@@ -68,6 +77,8 @@ type HttpWsConn struct {
 	writeChannel   chan []byte
 	controlChannel chan interface{}
 	closeChannel   chan *httpWsConnCloseData
+	onMessage      HttpWsConnOnMessage
+	onClose        HttpWsConnOnClose
 }
 
 func newHttpWsConn(logger FieldLogger, router *HttpWsRouter, c *gin.Context, conn *websocket.Conn) *HttpWsConn {
@@ -78,9 +89,11 @@ func newHttpWsConn(logger FieldLogger, router *HttpWsRouter, c *gin.Context, con
 		conn:           conn,
 		connId:         connId,
 		ctx:            make(map[string]interface{}),
-		writeChannel:   make(chan []byte, router.handler.WriteChannelSize()),
+		writeChannel:   make(chan []byte, router.writeChannelSize),
 		controlChannel: make(chan interface{}),
 		closeChannel:   make(chan *httpWsConnCloseData, 1),
+		onMessage:      httpWsConnOnMessage,
+		onClose:        httpWsConnOnClose,
 	}
 	wsConn.ctx["RemoteAddr"] = c.Request.RemoteAddr
 	return wsConn
@@ -97,6 +110,14 @@ func (m *HttpWsConn) Router() *HttpWsRouter {
 // ConnId 获取wsConn内存全局id
 func (m *HttpWsConn) ConnId() uint64 {
 	return m.connId
+}
+
+func (m *HttpWsConn) OnMessage(f HttpWsConnOnMessage) {
+	m.onMessage = f
+}
+
+func (m *HttpWsConn) OnClose(f HttpWsConnOnClose) {
+	m.onClose = f
 }
 
 // CtxLoad 读取业务key/value
@@ -202,96 +223,128 @@ func (m *HttpWsConn) String() string {
 	return fmt.Sprintf("wsConn=%d,remote_addr=%s", m.connId, m.RemoteAddr())
 }
 
-func (m *HttpWsConn) start() {
-	go func() {
-		tick := time.NewTicker(httpWsConnPingInterval)
-		defer tick.Stop()
+func (m *HttpWsConn) goWrite() {
+	tick := time.NewTicker(httpWsConnPingInterval)
+	defer tick.Stop()
 
-		writeNoNetErr := func(b []byte) {
-			_ = m.conn.WriteMessage(websocket.TextMessage, b)
+	writeNoNetErr := func(b []byte) {
+		_ = m.conn.WriteMessage(websocket.TextMessage, b)
+	}
+	var key string
+	var groups = make(map[uint64]*HttpWsConnGroup)
+loop:
+	for {
+		select {
+		case data := <-m.closeChannel:
+			if data == nil {
+				m.logger.Infof("正常退出")
+				m.onClose(m, HttpWsConnCloseFromNormal, nil, writeNoNetErr)
+			} else {
+				m.logger.Warnf("异常退出-%d,%v", data.from, data.err)
+				switch data.from {
+				// 以下close类型，在关闭前可以发送数据到客户端
+				case HttpWsConnCloseFromMessageErr, HttpWsConnCloseFromKeyReplace:
+					m.onClose(m, data.from, data.err, writeNoNetErr)
+				default:
+					m.onClose(m, data.from, data.err, nil)
+				}
+			}
+			break loop
+
+		case data := <-m.controlChannel:
+			switch d := data.(type) {
+			case *httpWsConnControlGroupData:
+				if d.op == 1 {
+					groups[d.group.groupId] = d.group
+				} else {
+					delete(groups, d.group.groupId)
+				}
+			case *httpWsConnControlKeyData:
+				key = d.key
+				m.CtxStore("Key", key)
+			}
+
+		case b := <-m.writeChannel:
+			m.logger.Debugf("WriteMessage=%s", b)
+			if err := m.conn.WriteMessage(websocket.TextMessage, b); err != nil {
+				m.logger.Errorf("write fail-%v,%s", err, b)
+				m.onClose(m, HttpWsConnCloseFromWriteErr, err, nil)
+				break loop
+			}
+
+		case <-tick.C:
+			if err := m.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				m.logger.Errorf("ping fail-%v", err)
+				m.onClose(m, HttpWsConnCloseFromPingErr, err, nil)
+				break loop
+			}
 		}
-		var key string
-		var groups = make(map[uint64]*HttpWsConnGroup)
-	loop:
+	}
+	m.logger.Infof("开始退出write协程,key=%s", key)
+	//启动一个协程来消耗writeChannel/controlChannel
+	go func() {
 		for {
 			select {
-			case data := <-m.closeChannel:
-				if data == nil {
-					m.logger.Infof("正常退出")
-					m.router.handler.OnClose(m, HttpWsConnCloseFromNormal, nil, writeNoNetErr)
-				} else {
-					m.logger.Warnf("异常退出-%d,%v", data.from, data.err)
-					switch data.from {
-					// 以下close类型，在关闭前可以发送数据到客户端
-					case HttpWsConnCloseFromConnectErr,
-						HttpWsConnCloseFromMessageErr,
-						HttpWsConnCloseFromKeyReplace:
-						m.router.handler.OnClose(m, data.from, data.err, writeNoNetErr)
-					default:
-						m.router.handler.OnClose(m, data.from, data.err, nil)
-					}
+			case d := <-m.writeChannel:
+				if d == nil {
+					return
 				}
-				break loop
-
-			case data := <-m.controlChannel:
-				switch d := data.(type) {
-				case *httpWsConnControlGroupData:
-					if d.op == 1 {
-						groups[d.group.groupId] = d.group
-					} else {
-						delete(groups, d.group.groupId)
-					}
-				case *httpWsConnControlKeyData:
-					key = d.key
-					m.CtxStore("Key", key)
-				}
-
-			case b := <-m.writeChannel:
-				if err := m.conn.WriteMessage(websocket.TextMessage, b); err != nil {
-					m.logger.Errorf("write fail-%v,%s", err, b)
-					m.router.handler.OnClose(m, HttpWsConnCloseFromWriteErr, err, nil)
-					break loop
-				}
-
-			case <-tick.C:
-				if err := m.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-					m.logger.Errorf("ping fail-%v", err)
-					m.router.handler.OnClose(m, HttpWsConnCloseFromPingErr, err, nil)
-					break loop
+			case d := <-m.controlChannel:
+				if d == nil {
+					return
 				}
 			}
 		}
-		m.logger.Infof("开始退出write协程,key=%s", key)
-		//启动一个协程来消耗writeChannel/controlChannel
-		go func() {
-			for {
-				select {
-				case d := <-m.writeChannel:
-					if d == nil {
-						return
-					}
-				case d := <-m.controlChannel:
-					if d == nil {
-						return
-					}
-				}
-			}
-		}()
-		//上写锁来设置write已经关闭
-		m.writeLock.Lock()
-		m.writeClosed.Store(true)
-		close(m.writeChannel)
-		close(m.controlChannel)
-		m.writeLock.Unlock()
-		//将conn从group中移除
-		for _, group := range groups {
-			group.Delete(m)
-		}
-		//将wsConn从router中移除
-		m.router.closeConn(key, m)
-		_ = m.conn.Close()
-		m.logger.Infof("结束退出write协程,key=%s", key)
 	}()
+	//上写锁来设置write已经关闭
+	m.writeLock.Lock()
+	m.writeClosed.Store(true)
+	close(m.writeChannel)
+	close(m.controlChannel)
+	m.writeLock.Unlock()
+	//将conn从group中移除
+	for _, group := range groups {
+		group.Delete(m)
+	}
+	//将wsConn从router中移除
+	m.router.closeConn(key, m)
+	_ = m.conn.Close()
+	m.logger.Infof("结束退出write协程,key=%s", key)
+}
+
+func (m *HttpWsConn) Start() error {
+	//启动write协程
+	go m.goWrite()
+
+	m.logger.Infof("开始ReadMessage")
+	var err error
+	var b []byte
+	var msg interface{}
+	for {
+		_, b, err = m.conn.ReadMessage()
+		if err != nil {
+			m.logger.Errorf("ReadMessage fail,err=%s", err)
+			if ErrIsTimeout(err) {
+				m.close(HttpWsConnCloseFromNoPong, err)
+			} else {
+				m.close(HttpWsConnCloseFromReadErr, err)
+			}
+			return err
+		}
+		//收到消息就重置read deadline
+		_ = m.conn.SetReadDeadline(time.Now().Add(httpWsConnReadDeadline))
+		m.logger.Debugf("ReadMessage=%s", b)
+		if msg, err = m.router.Unmarshal(b); err != nil {
+			m.logger.Warnf("Unmarshal error-%v,%s", err, b)
+			b = nil
+			continue
+		}
+		if err = m.onMessage(m, msg); err != nil {
+			m.logger.Errorf("onMessage fail,err=%v,%s", err, b)
+			m.close(HttpWsConnCloseFromMessageErr, err)
+			return err
+		}
+	}
 }
 
 func (m *HttpWsConn) close(from int, err error) {
@@ -348,16 +401,24 @@ func (m *HttpWsConnGroup) TryWrite(b []byte) {
 
 // HttpWsRouter 在http的handler中升级成websocket的封装
 type HttpWsRouter struct {
-	handler  HttpWsHandler
-	conns    *CMap[uint64, *HttpWsConn]
-	keyConns *CMap[string, *HttpWsConn]
+	writeChannelSize int
+	marshal          func(msg interface{}) ([]byte, error)
+	unmarshal        func(b []byte) (interface{}, error)
+	conns            *CMap[uint64, *HttpWsConn]
+	keyConns         *CMap[string, *HttpWsConn]
 }
 
-func NewHttpWsRouter(handler HttpWsHandler) *HttpWsRouter {
+func NewHttpWsRouter(
+	writeChannelSize int,
+	marshal func(msg interface{}) ([]byte, error),
+	unmarshal func(b []byte) (interface{}, error),
+) *HttpWsRouter {
 	router := &HttpWsRouter{
-		handler:  handler,
-		conns:    NewCMapUint64[*HttpWsConn](),
-		keyConns: NewCMapString[*HttpWsConn](),
+		writeChannelSize: writeChannelSize,
+		marshal:          marshal,
+		unmarshal:        unmarshal,
+		conns:            NewCMapUint64[*HttpWsConn](),
+		keyConns:         NewCMapString[*HttpWsConn](),
 	}
 	AddShutdownHook(func(wait *sync.WaitGroup) {
 		router.conns.Range(func(k uint64, v *HttpWsConn) bool {
@@ -380,11 +441,11 @@ func (m *HttpWsRouter) closeConn(key string, wsConn *HttpWsConn) {
 }
 
 func (m *HttpWsRouter) Marshal(msg interface{}) ([]byte, error) {
-	return m.handler.Marshal(msg)
+	return m.marshal(msg)
 }
 
 func (m *HttpWsRouter) Unmarshal(b []byte) (interface{}, error) {
-	return m.handler.Unmarshal(b)
+	return m.unmarshal(b)
 }
 
 // KeyConnBind 可以将wsConn绑定一个key，
@@ -430,7 +491,7 @@ func (m *HttpWsRouter) KeyConnRange(f func(key string, wsConn *HttpWsConn) bool)
 	m.keyConns.Range(f)
 }
 
-func (m *HttpWsRouter) Handle(c *gin.Context, onMessage func(wsConn *HttpWsConn, msg interface{}) error) error {
+func (m *HttpWsRouter) Create(c *gin.Context) (*HttpWsConn, error) {
 	logger := HttpLogger(c)
 	up := &websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
@@ -440,50 +501,16 @@ func (m *HttpWsRouter) Handle(c *gin.Context, onMessage func(wsConn *HttpWsConn,
 	conn, err := up.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		logger.Errorf("Upgrade fail - %s", err)
-		return err
+		return nil, err
 	}
 	if err = conn.SetReadDeadline(time.Now().Add(httpWsConnReadDeadline)); err != nil {
 		logger.Errorf("SetReadDeadline fail - %s", err)
-		return err
+		return nil, err
 	}
 	conn.SetPongHandler(func(appData string) error {
 		return conn.SetReadDeadline(time.Now().Add(httpWsConnReadDeadline))
 	})
-
 	wsConn := newHttpWsConn(logger, m, c, conn)
 	m.conns.Store(wsConn.connId, wsConn)
-	wsConn.start()
-	if err = m.handler.OnConnect(c, wsConn); err != nil {
-		wsConn.close(HttpWsConnCloseFromConnectErr, err)
-		return err
-	}
-
-	wsConn.logger.Infof("开始ReadMessage")
-	var b []byte
-	var msg interface{}
-	for {
-		_, b, err = conn.ReadMessage()
-		if err != nil {
-			logger.Errorf("ReadMessage fail,err=%s", err)
-			if ErrIsTimeout(err) {
-				wsConn.close(HttpWsConnCloseFromNoPong, err)
-			} else {
-				wsConn.close(HttpWsConnCloseFromReadErr, err)
-			}
-			return err
-		}
-		//收到消息就重置read deadline
-		_ = conn.SetReadDeadline(time.Now().Add(httpWsConnReadDeadline))
-		logger.Debugf("conn=%d,ReadMessage=%s", wsConn.connId, b)
-		if msg, err = m.handler.Unmarshal(b); err != nil {
-			logger.Warnf("Unmarshal error-%v,%s", err, b)
-			b = nil
-			continue
-		}
-		if err = onMessage(wsConn, msg); err != nil {
-			logger.Errorf("onMessage fail,err=%v,%s", err, b)
-			wsConn.close(HttpWsConnCloseFromMessageErr, err)
-			return err
-		}
-	}
+	return wsConn, nil
 }
