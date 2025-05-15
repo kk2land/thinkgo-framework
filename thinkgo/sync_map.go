@@ -17,28 +17,32 @@ func NewSyncMap[T any](create func(key string) (T, error)) *SyncMap[T] {
 	}
 }
 
-func (m *SyncMap[T]) Load(key string) (T, bool) {
-	return m.items.Load(key)
+func (m *SyncMap[T]) Load(key string) (val T, ok bool) {
+	if val1, ok1 := m.items.Load(key); ok1 {
+		return val1.(T), ok1
+	}
+	return
 }
 
-func (m *SyncMap[T]) LoadOrCreate(key string) (T, error) {
-	var val interface{}
-	var ok bool
-	if val, ok = m.items.Load(key); ok {
-		return val.(T), nil
+func (m *SyncMap[T]) LoadOrCreate(key string) (val T, err error) {
+	var val1 interface{}
+	var ok1 bool
+	if val1, ok1 = m.items.Load(key); ok1 {
+		return val1.(T), nil
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	//double check
-	if val, ok = m.items.Load(key); ok {
-		return val, nil
+	if val1, ok1 = m.items.Load(key); ok1 {
+		return val1.(T), nil
 	}
-	var err error
-	if val, err = m.create(key); err != nil {
-		return val, err
+	var err1 error
+	if val1, err1 = m.create(key); err1 != nil {
+		err = err1
+		return
 	}
-	m.items.Store(key, val)
-	return val, nil
+	m.items.Store(key, val1)
+	return val1.(T), nil
 }
 
 func (m *SyncMap[T]) Delete(key string) {
