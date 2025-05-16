@@ -203,8 +203,8 @@ func NginxHash(key string, num int) int {
 	return int((Crc32(key)>>16)&0x7fff) % num
 }
 
-// SafeGo 安全启动协程，panic时会告警，并且noPanic控制是否会panic
-func SafeGo(noPanic bool, f func()) {
+// SafeGo 安全启动协程，panic时会告警，并且shouldPanic控制是否会panic
+func SafeGo(shouldPanic bool, f func()) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -215,15 +215,15 @@ func SafeGo(noPanic bool, f func()) {
 					Logger.Errorf("stack=%s", stack)
 				} else {
 					var hit string
-					if noPanic {
-						hit = "错误"
-					} else {
+					if shouldPanic {
 						hit = "退出"
+					} else {
+						hit = "错误"
 					}
 					OpsAlarm("%s 协程panic%s-%v", AppName, hit, r)
 					stack := Stack(3, 5)
 					Logger.Errorf("stack=%s", stack)
-					if !noPanic {
+					if shouldPanic {
 						panic(r)
 					}
 				}
