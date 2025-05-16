@@ -56,5 +56,5 @@ func (m *ConversionInt64) UnmarshalJSON(b []byte) error {
 }
 
 func (m ConversionInt64) MarshalJSON() ([]byte, error) {
-	return []byte(strconv.FormatInt(m.Int64(), 10)), nil
+	return []byte("\"" + m.String() + "\""), nil
 }
