@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-// ConversionInt64 将string转成int64，支持json/toml
+// ConversionInt64 将string转成int64的序列化/反序列化，支持json/toml
 type ConversionInt64 int64
 
 func ParseConversionInt64(s string) (ConversionInt64, error) {
