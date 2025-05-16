@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-// ConversionUInt32s json/xorm的uint32数组，格式：[0, 1, ...] or "0,1,..."
+// ConversionUInt32s 格式：[0, 1, ...] or "0,1,..."的序列化/反序列化，支持json/xorm
 type ConversionUInt32s []uint32
 
 func (c *ConversionUInt32s) UnmarshalJSON(b []byte) error {
