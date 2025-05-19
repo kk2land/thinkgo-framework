@@ -75,8 +75,8 @@ func redisCreate(name string) (*RedisClient, error) {
 	}
 	optConfig := config.getOptions()
 	if optConfig.Timeout > 0 {
-		opt.DialTimeout = optConfig.Timeout.ToDuration()
-		opt.ReadTimeout = optConfig.Timeout.ToDuration()
+		opt.DialTimeout = optConfig.Timeout.Duration()
+		opt.ReadTimeout = optConfig.Timeout.Duration()
 	}
 	if optConfig.PoolSize > 0 {
 		opt.PoolSize = optConfig.PoolSize
@@ -84,10 +84,10 @@ func redisCreate(name string) (*RedisClient, error) {
 	if optConfig.MaxRetries != 0 {
 		opt.MaxRetries = optConfig.MaxRetries
 		if optConfig.MinRetryBackoff != 0 {
-			opt.MinRetryBackoff = optConfig.MinRetryBackoff.ToDuration()
+			opt.MinRetryBackoff = optConfig.MinRetryBackoff.Duration()
 		}
 		if optConfig.MaxRetryBackoff != 0 {
-			opt.MaxRetryBackoff = optConfig.MaxRetryBackoff.ToDuration()
+			opt.MaxRetryBackoff = optConfig.MaxRetryBackoff.Duration()
 		}
 	} else {
 		opt.MaxRetries = 0

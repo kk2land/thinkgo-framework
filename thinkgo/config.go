@@ -6,30 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"time"
 )
 
 // 框架配置类
-
-// ConfigTypeDuration 让toml的值支持时间duration格式：100、100s、100m...
-type ConfigTypeDuration time.Duration
-
-func (d *ConfigTypeDuration) UnmarshalText(text []byte) error {
-	s := string(text)
-	if ok, _ := regexp.MatchString("^[0-9]+$", s); ok {
-		s = s + "s"
-	}
-	if dur, err := time.ParseDuration(s); err != nil {
-		return err
-	} else {
-		*d = ConfigTypeDuration(dur)
-		return nil
-	}
-}
-
-func (d ConfigTypeDuration) ToDuration() time.Duration {
-	return time.Duration(d)
-}
 
 type appConfig struct {
 	AppName     string            `toml:"app_name"`
@@ -47,9 +26,9 @@ type httpConfig struct {
 	Port           int
 	WithGrpc       bool
 	RootPath       string
-	ReadTimeout    ConfigTypeDuration
-	WriteTimeout   ConfigTypeDuration
-	IdleTimeout    ConfigTypeDuration
+	ReadTimeout    ConversionDuration
+	WriteTimeout   ConversionDuration
+	IdleTimeout    ConversionDuration
 	MaxHeaderBytes int
 }
 
@@ -59,11 +38,11 @@ type grpcConfig struct {
 }
 
 type redisOptionConfig struct {
-	Timeout         ConfigTypeDuration
+	Timeout         ConversionDuration
 	PoolSize        int
 	MaxRetries      int
-	MinRetryBackoff ConfigTypeDuration
-	MaxRetryBackoff ConfigTypeDuration
+	MinRetryBackoff ConversionDuration
+	MaxRetryBackoff ConversionDuration
 }
 
 type redisConfig struct {
@@ -86,8 +65,8 @@ type dbConfig struct {
 	DriverName        string
 	DriverSourceName  string
 	DriverSourceNames []string
-	ConnMaxLifetime   ConfigTypeDuration
-	ConnMaxIdleTime   ConfigTypeDuration
+	ConnMaxLifetime   ConversionDuration
+	ConnMaxIdleTime   ConversionDuration
 	MaxOpenConns      int
 	Cmd2MaxOpenConns  map[string]int `toml:"cmd_maxOpenConns"`
 }

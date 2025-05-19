@@ -149,13 +149,13 @@ func HttpStartServer() {
 		h2c.NewHandler(handler, &http2.Server{}),
 		func(server *http.Server, registerSignalHook HttpServerRegisterSignalHook) {
 			if Config.Http.ReadTimeout != 0 {
-				server.ReadTimeout = Config.Http.ReadTimeout.ToDuration()
+				server.ReadTimeout = Config.Http.ReadTimeout.Duration()
 			}
 			if Config.Http.WriteTimeout != 0 {
-				server.WriteTimeout = Config.Http.WriteTimeout.ToDuration()
+				server.WriteTimeout = Config.Http.WriteTimeout.Duration()
 			}
 			if Config.Http.IdleTimeout != 0 {
-				server.IdleTimeout = Config.Http.IdleTimeout.ToDuration()
+				server.IdleTimeout = Config.Http.IdleTimeout.Duration()
 			}
 			if Config.Http.MaxHeaderBytes != 0 {
 				server.MaxHeaderBytes = Config.Http.MaxHeaderBytes

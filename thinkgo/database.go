@@ -97,7 +97,7 @@ func dbCreate(name string) (*DBInstance, error) {
 			return nil, err
 		}
 		if config.ConnMaxLifetime != 0 {
-			engine.SetConnMaxIdleTime(config.ConnMaxIdleTime.ToDuration())
+			engine.SetConnMaxIdleTime(config.ConnMaxIdleTime.Duration())
 		}
 		db.EngineInterface = engine
 		db.IsCluster = false
@@ -108,9 +108,9 @@ func dbCreate(name string) (*DBInstance, error) {
 			return nil, err
 		}
 		if config.ConnMaxIdleTime != 0 {
-			engineGroup.Master().SetConnMaxIdleTime(config.ConnMaxIdleTime.ToDuration())
+			engineGroup.Master().SetConnMaxIdleTime(config.ConnMaxIdleTime.Duration())
 			for _, slave := range engineGroup.Slaves() {
-				slave.SetConnMaxIdleTime(config.ConnMaxIdleTime.ToDuration())
+				slave.SetConnMaxIdleTime(config.ConnMaxIdleTime.Duration())
 			}
 		}
 		db.EngineInterface = engineGroup
@@ -122,7 +122,7 @@ func dbCreate(name string) (*DBInstance, error) {
 		db.SetMaxOpenConns(config.getMaxOpenConns())
 	}
 	if config.ConnMaxLifetime != 0 {
-		db.SetConnMaxLifetime(config.ConnMaxLifetime.ToDuration())
+		db.SetConnMaxLifetime(config.ConnMaxLifetime.Duration())
 	}
 
 	db.SetLogger(&dbLogger{FieldLogger: Logger})
