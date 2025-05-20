@@ -17,7 +17,9 @@ func (c *ConversionInts) UnmarshalJSON(b []byte) error {
 	}
 	switch b[0] {
 	case '"':
-		return c.FromDB(b[1 : len(b)-1])
+		return c.FromDB(bytes.Trim(b, "\""))
+	case '\'':
+		return c.FromDB(bytes.Trim(b, "'"))
 	case '[':
 		var arr []interface{}
 		if err := json.Unmarshal(b, &arr); err != nil {

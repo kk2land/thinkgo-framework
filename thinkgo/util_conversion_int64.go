@@ -5,12 +5,15 @@ import (
 	"strconv"
 )
 
-// ConversionInt64 将string转成int64的序列化/反序列化，支持json/toml
+// ConversionInt64 将string转成int64的序列化/反序列化，支持json/toml; null->0; ""->0;
 type ConversionInt64 int64
 
 func ParseConversionInt64(s string) (ConversionInt64, error) {
-	i, err := strconv.ParseInt(s, 10, 64)
-	return ConversionInt64(i), err
+	if len(s) > 0 {
+		i, err := strconv.ParseInt(s, 10, 64)
+		return ConversionInt64(i), err
+	}
+	return 0, nil
 }
 
 func ToConversionInt64(i int64) ConversionInt64 {
@@ -38,20 +41,12 @@ func (m *ConversionInt64) UnmarshalJSON(b []byte) error {
 	if bytes.Equal(b, ConversionJsonNull) {
 		return nil
 	}
-	if b[0] == '"' || b[0] == '\'' {
-		if i, err := ParseConversionInt64(string(b[1 : len(b)-1])); err != nil {
-			return err
-		} else {
-			*m = i
-			return nil
-		}
+	b = bytesTrimQuote(b)
+	if i, err := ParseConversionInt64(string(b)); err != nil {
+		return err
 	} else {
-		if i, err := ParseConversionInt64(string(b)); err != nil {
-			return err
-		} else {
-			*m = i
-			return nil
-		}
+		*m = i
+		return nil
 	}
 }
 

@@ -6,16 +6,17 @@ import (
 	"math/big"
 )
 
-// ConversionDecimal 序列化/反序列化big.Float，支持json/toml/xorm
+// ConversionDecimal 序列化/反序列化big.Float，支持json/toml/xorm；null->nil; ""->new(big.Float)
 type ConversionDecimal big.Float
 
 func ParseConversionDecimal(s string) (*ConversionDecimal, error) {
 	f := new(big.Float)
-	if _, ok := f.SetString(s); !ok {
-		return nil, fmt.Errorf("ConversionDecimal invalid-%s", s)
-	} else {
-		return (*ConversionDecimal)(f), nil
+	if len(s) > 0 {
+		if _, ok := f.SetString(s); !ok {
+			return nil, fmt.Errorf("ConversionDecimal invalid-%s", s)
+		}
 	}
+	return (*ConversionDecimal)(f), nil
 }
 
 func ToConversionDecimal(f *big.Float) *ConversionDecimal {
@@ -31,23 +32,20 @@ func (m *ConversionDecimal) String() string {
 }
 
 func (m *ConversionDecimal) UnmarshalText(text []byte) error {
-	s := string(text)
-	_, ok := m.Float().SetString(s)
-	if !ok {
-		return fmt.Errorf("无法解析ConversionDecimal-%s", s)
-	} else {
-		return nil
+	f, err := ParseConversionDecimal(string(text))
+	if err != nil {
+		return err
 	}
+	m = f
+	return nil
 }
 
 func (m *ConversionDecimal) UnmarshalJSON(b []byte) error {
 	if bytes.Equal(b, ConversionJsonNull) {
 		return nil
 	}
-	if b[0] == '"' || b[0] == '\'' {
-		return m.FromDB(b[1 : len(b)-1])
-	}
-	return fmt.Errorf("json解析非字符串-%s", string(b))
+	b = bytesTrimQuote(b)
+	return m.FromDB(b)
 }
 
 func (m ConversionDecimal) MarshalJSON() ([]byte, error) {
@@ -59,12 +57,12 @@ func (m ConversionDecimal) MarshalJSON() ([]byte, error) {
 }
 
 func (m *ConversionDecimal) FromDB(b []byte) error {
-	f := (*big.Float)(m)
-	if _, ok := f.SetString(string(b)); !ok {
-		return fmt.Errorf("ConversionDecimal invalid-%s", b)
-	} else {
-		return nil
+	f, err := ParseConversionDecimal(string(b))
+	if err != nil {
+		return err
 	}
+	m = f
+	return nil
 }
 
 func (m *ConversionDecimal) ToDB() ([]byte, error) {

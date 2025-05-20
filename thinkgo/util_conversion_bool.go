@@ -33,11 +33,8 @@ func (m *ConversionBool) UnmarshalJSON(b []byte) error {
 	if bytes.Equal(b, ConversionJsonNull) {
 		return nil
 	}
-	if b[0] == '"' || b[0] == '\'' {
-		*m = ParseConversionBool(string(b[1 : len(b)-1]))
-	} else {
-		*m = ParseConversionBool(string(b))
-	}
+	b = bytesTrimQuote(b)
+	*m = ParseConversionBool(string(b))
 	return nil
 }
 

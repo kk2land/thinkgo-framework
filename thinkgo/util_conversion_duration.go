@@ -2,12 +2,11 @@ package thinkgo
 
 import (
 	"bytes"
-	"fmt"
 	"regexp"
 	"time"
 )
 
-// ConversionDuration 序列化/反序列化time.Duration，支持json/toml/xorm
+// ConversionDuration 序列化/反序列化time.Duration，支持json/toml/xorm；null->false;
 //
 //	反序列化支持的格式 = "10(默认秒)、10ms(毫秒)、10s(秒)、3m(分)、3h(时)";
 type ConversionDuration time.Duration
@@ -49,10 +48,8 @@ func (m *ConversionDuration) UnmarshalJSON(b []byte) error {
 	if bytes.Equal(b, ConversionJsonNull) {
 		return nil
 	}
-	if b[0] == '"' || b[0] == '\'' {
-		return m.FromDB(b[1 : len(b)-1])
-	}
-	return fmt.Errorf("json解析非字符串-%s", string(b))
+	b = bytesTrimQuote(b)
+	return m.FromDB(b)
 }
 
 func (m ConversionDuration) MarshalJSON() ([]byte, error) {
