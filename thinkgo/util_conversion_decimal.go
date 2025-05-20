@@ -6,7 +6,8 @@ import (
 	"math/big"
 )
 
-// ConversionDecimal 序列化/反序列化big.Float，支持json/toml/xorm；null->nil; ""->new(big.Float)
+// ConversionDecimal 序列化/反序列化big.Float，支持json/toml/xorm；
+// 反序列化: null->nil; ""->new(big.Float)
 type ConversionDecimal big.Float
 
 func ParseConversionDecimal(s string) (*ConversionDecimal, error) {
@@ -36,7 +37,7 @@ func (m *ConversionDecimal) UnmarshalText(text []byte) error {
 	if err != nil {
 		return err
 	}
-	m = f
+	*m = *f
 	return nil
 }
 
@@ -61,7 +62,7 @@ func (m *ConversionDecimal) FromDB(b []byte) error {
 	if err != nil {
 		return err
 	}
-	m = f
+	*m = *f
 	return nil
 }
 
