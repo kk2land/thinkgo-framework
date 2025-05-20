@@ -29,7 +29,7 @@ func (m *ConversionDecimal) Float() *big.Float {
 }
 
 func (m *ConversionDecimal) String() string {
-	return m.Float().Text('f', 10)
+	return m.Float().Text('f', -1)
 }
 
 func (m *ConversionDecimal) UnmarshalText(text []byte) error {
