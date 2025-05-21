@@ -19,14 +19,13 @@ import (
 //		不存在 -> new(big.Float)
 type ConversionDecimal big.Float
 
-func ParseConversionDecimal(s string) (*ConversionDecimal, error) {
-	f := new(big.Float)
+func ParseConversionDecimal(s string, d *ConversionDecimal) error {
 	if len(s) > 0 {
-		if _, ok := f.SetString(s); !ok {
-			return nil, fmt.Errorf("ConversionDecimal invalid-%s", s)
+		if _, ok := d.Float().SetString(s); !ok {
+			return fmt.Errorf("ConversionDecimal invalid-%s", s)
 		}
 	}
-	return (*ConversionDecimal)(f), nil
+	return nil
 }
 
 func ToConversionDecimal(f *big.Float) *ConversionDecimal {
@@ -42,11 +41,9 @@ func (m *ConversionDecimal) String() string {
 }
 
 func (m *ConversionDecimal) UnmarshalText(text []byte) error {
-	f, err := ParseConversionDecimal(string(text))
-	if err != nil {
+	if err := ParseConversionDecimal(string(text), m); err != nil {
 		return err
 	}
-	m.Float().Copy(f.Float())
 	return nil
 }
 
@@ -66,11 +63,9 @@ func (m ConversionDecimal) MarshalJSON() ([]byte, error) {
 }
 
 func (m *ConversionDecimal) FromDB(b []byte) error {
-	f, err := ParseConversionDecimal(string(b))
-	if err != nil {
+	if err := ParseConversionDecimal(string(b), m); err != nil {
 		return err
 	}
-	m.Float().Copy(f.Float())
 	return nil
 }
 
