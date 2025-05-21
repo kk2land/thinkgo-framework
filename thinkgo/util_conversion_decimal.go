@@ -37,7 +37,7 @@ func (m *ConversionDecimal) UnmarshalText(text []byte) error {
 	if err != nil {
 		return err
 	}
-	*m = *f
+	m.Float().Copy(f.Float())
 	return nil
 }
 
@@ -45,8 +45,7 @@ func (m *ConversionDecimal) UnmarshalJSON(b []byte) error {
 	if bytes.Equal(b, ConversionJsonNull) {
 		return nil
 	}
-	b = bytesTrimQuote(b)
-	return m.FromDB(b)
+	return m.FromDB(bytesTrimQuote(b))
 }
 
 func (m ConversionDecimal) MarshalJSON() ([]byte, error) {
@@ -62,7 +61,7 @@ func (m *ConversionDecimal) FromDB(b []byte) error {
 	if err != nil {
 		return err
 	}
-	*m = *f
+	m.Float().Copy(f.Float())
 	return nil
 }
 
