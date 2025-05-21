@@ -7,7 +7,16 @@ import (
 )
 
 // ConversionDecimal 序列化/反序列化big.Float，支持json/toml/xorm；
-// 反序列化: null->nil; ""->new(big.Float)
+// 反序列化说明：
+//
+//	*ConversionDecimal:
+//		null -> nil
+//		"" -> new(big.Float)
+//		不存在 -> nil
+//	ConversionDecimal:
+//		null -> new(big.Float)
+//		"" -> new(big.Float)
+//		不存在 -> new(big.Float)
 type ConversionDecimal big.Float
 
 func ParseConversionDecimal(s string) (*ConversionDecimal, error) {
