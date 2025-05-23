@@ -36,6 +36,11 @@ func (m *ConversionDecimal) Float() *big.Float {
 	return (*big.Float)(m)
 }
 
+func (m *ConversionDecimal) Float64() float64 {
+	f, _ := m.Float().Float64()
+	return f
+}
+
 func (m *ConversionDecimal) String() string {
 	return m.Float().Text('f', -1)
 }
