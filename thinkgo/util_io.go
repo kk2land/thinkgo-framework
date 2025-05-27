@@ -6,6 +6,7 @@ package thinkgo
 //*/
 //import "C"
 import (
+	"github.com/erikdubbelboer/gspt"
 	"golang.org/x/term"
 	"io"
 	"os"
@@ -73,4 +74,8 @@ func IsFile(path string) bool {
 		return false
 	}
 	return !s.IsDir()
+}
+
+func SetProcessTitle(title string) {
+	gspt.SetProcTitle(title)
 }

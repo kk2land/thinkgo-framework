@@ -127,7 +127,7 @@ func init() {
 			}
 		}
 		str := obj.(string)
-		if err := opsAlarmSyslog.Err(str); err != nil {
+		if err = opsAlarmSyslog.Err(str); err != nil {
 			Logger.Errorf("opsAlarmSyslog write fail,err=%s,str=%s", err, str)
 			_ = opsAlarmSyslog.Close()
 			opsAlarmSyslog = nil
