@@ -29,6 +29,7 @@ type LeaderRedis struct {
 	done         chan Void
 	state        atomic.Bool
 	stateCh      chan Void
+	period       int //多少秒更新一次redis
 }
 
 func NewLeaderRedis(name string, id int, client *RedisClient) *LeaderRedis {
@@ -38,7 +39,12 @@ func NewLeaderRedis(name string, id int, client *RedisClient) *LeaderRedis {
 		client:  client,
 		done:    make(chan Void),
 		stateCh: make(chan Void, 1),
+		period:  5,
 	}
+}
+
+func (l *LeaderRedis) SetPeriod(period int) {
+	l.period = period
 }
 
 func (l *LeaderRedis) Watch(f LeaderWatchHandler) {
@@ -119,7 +125,7 @@ end
 
 	key := l.client.Prefix("tk-leader-" + l.name)
 	token := fmt.Sprintf("%s-%d", Hostname, l.id)
-	ttl := 15
+	ttl := 3 * l.period
 	call := func() {
 		cmd := l.client.Raw().EvalSha(ctx, scriptSha1, []string{key}, token, ttl)
 		if !RedisErrNilOrKeyNotExist(cmd.Err()) {
@@ -135,7 +141,7 @@ end
 	}
 	call()
 
-	tick := time.NewTicker(5 * time.Second)
+	tick := time.NewTicker(time.Duration(l.period) * time.Second)
 	defer tick.Stop()
 	for {
 		select {
