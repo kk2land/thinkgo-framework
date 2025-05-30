@@ -16,6 +16,10 @@ type LeaderWatchHandler func(isLeader bool)
 type Leader interface {
 	// Watch 注册回调函数，当leader有变化时，会触发回调
 	Watch(f LeaderWatchHandler)
+	// Online 重新参与leader选举
+	Online()
+	// Offline 退出leader选举
+	Offline()
 }
 
 // LeaderRedis 基于redis实现的Leader
@@ -29,7 +33,8 @@ type LeaderRedis struct {
 	done         chan Void
 	state        atomic.Bool
 	stateCh      chan Void
-	period       int //多少秒更新一次redis
+	period       int         //多少秒更新一次redis
+	offline      atomic.Bool //是否下线不参与leader选举
 }
 
 func NewLeaderRedis(name string, id int, client *RedisClient) *LeaderRedis {
@@ -56,6 +61,14 @@ func (l *LeaderRedis) Watch(f LeaderWatchHandler) {
 		AddShutdownHook(l.stop)
 	}
 	l.handlers = append(l.handlers, f)
+}
+
+func (l *LeaderRedis) Online() {
+	l.offline.Store(false)
+}
+
+func (l *LeaderRedis) Offline() {
+	l.offline.Store(true)
 }
 
 func (l *LeaderRedis) start() {
@@ -139,14 +152,24 @@ end
 			}
 		}
 	}
-	call()
+	if !l.offline.Load() {
+		call()
+	}
 
 	tick := time.NewTicker(time.Duration(l.period) * time.Second)
 	defer tick.Stop()
 	for {
 		select {
 		case <-tick.C:
-			call()
+			if l.offline.Load() {
+				//下线了，不参与leader选举
+				l.state.Store(false)
+				select {
+				case l.stateCh <- VoidValue:
+				}
+			} else {
+				call()
+			}
 		case <-l.done:
 			break
 		}
