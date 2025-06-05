@@ -32,8 +32,8 @@ func ToConversionDecimal(f *big.Float) *ConversionDecimal {
 	return (*ConversionDecimal)(f)
 }
 
-func (m *ConversionDecimal) Truncate(factor *big.Float) *big.Float {
-	return TruncateBigFloat(m.Float(), factor)
+func (m *ConversionDecimal) Truncate(factor *big.Float) *ConversionDecimal {
+	return ToConversionDecimal(TruncateBigFloat(m.Float(), factor))
 }
 
 func (m *ConversionDecimal) Float() *big.Float {
