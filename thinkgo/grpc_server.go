@@ -169,15 +169,15 @@ func grpcErrStreamServerInterceptor(srv interface{}, ss grpc.ServerStream, info 
 	return handler(srv, ss)
 }
 
-func GrpcEnable() bool {
-	switch CommandName {
-	case CommandNameHttp:
-		return Config.Http.WithGrpc
-	case CommandNameGrpc:
-		return true
-	}
-	return false
-}
+//func GrpcEnable() bool {
+//	switch CommandName {
+//	case CommandNameHttp:
+//		return Config.Http.WithGrpc
+//	case CommandNameGrpc:
+//		return true
+//	}
+//	return false
+//}
 
 // GrpcServer 获取GrpcServer
 func GrpcServer() *grpc.Server {

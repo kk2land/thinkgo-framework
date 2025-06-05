@@ -30,16 +30,16 @@ var httpPort int
 var httpRequestPrefix []byte
 var httpRequestCounter uint64
 
-// HttpInitServer 默认的httpServer初始化
+// httpInitServer 默认的httpServer初始化
 // 必须在使用HttpStartServer()/HttpStartServerWithConfig()之前调用;
 // 如果CommandName是http/http_check，则会自动调用
-func HttpInitServer() {
-	HttpInitServerWithConfig(&Config.Http)
+func httpInitServer() {
+	httpInitServerWithConfig(&Config.Http)
 }
 
-// HttpInitServerWithConfig httpServer初始化
+// httpInitServerWithConfig httpServer初始化
 // 必须在使用HttpEngine()/HttpRouter()/HttpStartServer()/HttpStartServerWithConfig()之前调用
-func HttpInitServerWithConfig(httpConfig *HttpConfig) {
+func httpInitServerWithConfig(httpConfig *HttpConfig) {
 	gin.DefaultWriter = Logger.Out()
 	gin.DefaultErrorWriter = Logger.Out()
 	if AppDebug {
@@ -48,7 +48,7 @@ func HttpInitServerWithConfig(httpConfig *HttpConfig) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	httpRequestPrefix = []byte(fmt.Sprintf("%d_", Pid))
-	Logger.Infof("HttpInitServerWithConfig finished-%d", httpConfig.Port)
+	Logger.Infof("httpInitServerWithConfig finished-%d", httpConfig.Port)
 }
 
 func httpIncrReqId() string {
@@ -148,6 +148,8 @@ func HttpStartServer() {
 
 // HttpStartServerWithConfig 启动gin的http-server
 func HttpStartServerWithConfig(httpConfig *HttpConfig) {
+	httpInitServerWithConfig(httpConfig)
+
 	port := httpConfig.Port
 	if port <= 0 {
 		envPort := os.Getenv(envKeyInternalHttpPort)

@@ -136,10 +136,6 @@ func init() {
 	})
 	opsAlarmGoQueue.Start()
 
-	switch CommandName {
-	case CommandNameHttp, CommandNameHttpCheck:
-		HttpInitServer()
-	}
 	initRedis()
 }
 
