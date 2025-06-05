@@ -138,7 +138,7 @@ func init() {
 
 	switch CommandName {
 	case CommandNameHttp, CommandNameHttpCheck:
-		HttpServerInit()
+		HttpInitServer()
 	}
 	initRedis()
 }

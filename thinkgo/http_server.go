@@ -30,16 +30,16 @@ var httpPort int
 var httpRequestPrefix []byte
 var httpRequestCounter uint64
 
-// HttpServerInit 默认的httpServer初始化
+// HttpInitServer 默认的httpServer初始化
 // 必须在使用HttpStartServer()/HttpStartServerWithConfig()之前调用;
 // 如果CommandName是http/http_check，则会自动调用
-func HttpServerInit() {
-	HttpServerInitWithConfig(&Config.Http)
+func HttpInitServer() {
+	HttpInitServerWithConfig(&Config.Http)
 }
 
-// HttpServerInitWithConfig httpServer初始化
+// HttpInitServerWithConfig httpServer初始化
 // 必须在使用HttpEngine()/HttpRouter()/HttpStartServer()/HttpStartServerWithConfig()之前调用
-func HttpServerInitWithConfig(httpConfig *HttpConfig) {
+func HttpInitServerWithConfig(httpConfig *HttpConfig) {
 	gin.DefaultWriter = Logger.Out()
 	gin.DefaultErrorWriter = Logger.Out()
 	if AppDebug {
@@ -48,7 +48,7 @@ func HttpServerInitWithConfig(httpConfig *HttpConfig) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	httpRequestPrefix = []byte(fmt.Sprintf("%d_", Pid))
-	Logger.Infof("HttpServerInitWithConfig finished-%d", httpConfig.Port)
+	Logger.Infof("HttpInitServerWithConfig finished-%d", httpConfig.Port)
 }
 
 func httpIncrReqId() string {
