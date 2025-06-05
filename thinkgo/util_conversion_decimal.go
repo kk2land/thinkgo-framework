@@ -33,13 +33,7 @@ func ToConversionDecimal(f *big.Float) *ConversionDecimal {
 }
 
 func (m *ConversionDecimal) Truncate(factor *big.Float) *big.Float {
-	val := new(big.Float).Mul(m.Float(), factor)
-	// 四舍五入：tmp + 0.5，然后取整
-	val.Add(val, Float0_5)
-	intPart, _ := val.Int(nil) // 去掉小数部分
-	// 转回浮点数：intPart / factor
-	val.SetInt(intPart)
-	return val.Quo(val, factor)
+	return TruncateBigFloat(m.Float(), factor)
 }
 
 func (m *ConversionDecimal) Float() *big.Float {
