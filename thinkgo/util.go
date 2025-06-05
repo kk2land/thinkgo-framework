@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"math/big"
 	"math/rand"
 	"net"
 	"sort"
@@ -32,6 +33,9 @@ var ConversionJsonNull = []byte{'n', 'u', 'l', 'l'}
 
 // VoidValue 空值
 var VoidValue Void
+
+// float 0.5
+var Float0_5 = big.NewFloat(0.5)
 
 // Void 无意义类型，一般给channel使用
 type Void struct{}
