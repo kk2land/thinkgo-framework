@@ -24,7 +24,13 @@ var httpPort int
 var httpRequestPrefix []byte
 var httpRequestCounter uint64
 
-func initHttpServer() {
+// HttpServerInit 默认的httpServer初始化
+func HttpServerInit() {
+	HttpServerInitWithConfig(&Config.Http)
+}
+
+// HttpServerInitWithConfig httpServer初始化
+func HttpServerInitWithConfig(httpConfig *HttpConfig) {
 	gin.DefaultWriter = Logger.Out()
 	gin.DefaultErrorWriter = Logger.Out()
 	if AppDebug {
@@ -49,13 +55,13 @@ func initHttpServer() {
 	funcs = append(funcs, httpErrorHandler)
 	httpEngine.Use(funcs...)
 
-	rootPath := strings.TrimSpace(Config.Http.RootPath)
-	if len(rootPath) == 0 || Config.Http.RootPath == "/" {
+	rootPath := strings.TrimSpace(httpConfig.RootPath)
+	if len(rootPath) == 0 || httpConfig.RootPath == "/" {
 		httpRouter = httpEngine
 	} else {
 		httpRouter = httpEngine.Group(rootPath)
 	}
-	Logger.Info("initHttpServer finished")
+	Logger.Infof("HttpServerInitWithConfig finished-%d", httpConfig.Port)
 }
 
 func httpIncrReqId() string {
@@ -126,9 +132,14 @@ func HttpRouter() gin.IRouter {
 	return httpRouter
 }
 
-// HttpStartServer 启动gin的http-server
+// HttpStartServerDefault 启动默认配置gin的http-server
 func HttpStartServer() {
-	port := Config.Http.Port
+	HttpStartServerWithConfig(&Config.Http)
+}
+
+// HttpStartServerWithConfig 启动gin的http-server
+func HttpStartServerWithConfig(httpConfig *HttpConfig) {
+	port := httpConfig.Port
 	if port <= 0 {
 		envPort := os.Getenv(envKeyInternalHttpPort)
 		if len(envPort) > 0 {
@@ -139,7 +150,7 @@ func HttpStartServer() {
 		}
 	}
 	var handler http.Handler
-	if Config.Http.WithGrpc {
+	if httpConfig.WithGrpc {
 		handler = grpcHttpHandler(HttpEngine())
 	} else {
 		handler = HttpEngine()
@@ -148,17 +159,17 @@ func HttpStartServer() {
 		port,
 		h2c.NewHandler(handler, &http2.Server{}),
 		func(server *http.Server, registerSignalHook HttpServerRegisterSignalHook) {
-			if Config.Http.ReadTimeout != 0 {
-				server.ReadTimeout = Config.Http.ReadTimeout.Duration()
+			if httpConfig.ReadTimeout != 0 {
+				server.ReadTimeout = httpConfig.ReadTimeout.Duration()
 			}
-			if Config.Http.WriteTimeout != 0 {
-				server.WriteTimeout = Config.Http.WriteTimeout.Duration()
+			if httpConfig.WriteTimeout != 0 {
+				server.WriteTimeout = httpConfig.WriteTimeout.Duration()
 			}
-			if Config.Http.IdleTimeout != 0 {
-				server.IdleTimeout = Config.Http.IdleTimeout.Duration()
+			if httpConfig.IdleTimeout != 0 {
+				server.IdleTimeout = httpConfig.IdleTimeout.Duration()
 			}
-			if Config.Http.MaxHeaderBytes != 0 {
-				server.MaxHeaderBytes = Config.Http.MaxHeaderBytes
+			if httpConfig.MaxHeaderBytes != 0 {
+				server.MaxHeaderBytes = httpConfig.MaxHeaderBytes
 			}
 		},
 	)

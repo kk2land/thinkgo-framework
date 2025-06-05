@@ -24,9 +24,9 @@ const (
 	envKeyInternalHttpPort = "_TK_Internal_HttpPort" // http服务内部使用，对于随机的端口，reload后保持端口不变
 	envKeyLogConsole       = "_TK_LogConsole"        // '1'则直接将日志输出到屏幕上
 
-	CommandNameHttp  = "http"  //二进制命令名-http
-	CommandNameGrpc  = "grpc"  //二进制命令-grpc
-	CommandNameCheck = "check" //二进制命令-check: 检查配置/环境变量是否有问题
+	CommandNameHttp      = "http"       //二进制命令名-http
+	CommandNameGrpc      = "grpc"       //二进制命令-grpc
+	CommandNameHttpCheck = "http_check" //二进制命令-httpCheck: 检查配置/环境变量是否有问题
 )
 
 var (
@@ -137,8 +137,8 @@ func init() {
 	opsAlarmGoQueue.Start()
 
 	switch CommandName {
-	case CommandNameHttp, CommandNameCheck:
-		initHttpServer()
+	case CommandNameHttp, CommandNameHttpCheck:
+		HttpServerInit()
 	}
 	initRedis()
 }

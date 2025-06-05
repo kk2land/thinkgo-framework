@@ -15,14 +15,14 @@ type appConfig struct {
 	AppDebug    bool              `toml:"app_debug"`
 	OpsAlarm    string            `toml:"ops_alarm"`
 	CmdLogNames map[string]string `toml:"cmd_logNames"`
-	Http        httpConfig
+	Http        HttpConfig
 	Grpc        grpcConfig
 	Redis       map[string]redisConfig
 	DB          map[string]dbConfig `toml:"database"`
 	Custom      JMap
 }
 
-type httpConfig struct {
+type HttpConfig struct {
 	Port           int
 	WithGrpc       bool
 	RootPath       string
