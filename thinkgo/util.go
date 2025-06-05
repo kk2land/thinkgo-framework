@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"math"
 	"math/big"
 	"math/rand"
 	"net"
@@ -275,4 +276,9 @@ func TruncateBigFloat(f *big.Float, factor *big.Float) *big.Float {
 	// 转回浮点数：intPart / factor
 	val.SetInt(intPart)
 	return val.Quo(val, factor)
+}
+
+func TruncateFloat64(f float64, decimal int) float64 {
+	factor := math.Pow(10, float64(decimal))
+	return math.Round(f*factor) / factor
 }
