@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
+	"sync"
 	"sync/atomic"
 )
 
@@ -17,19 +17,28 @@ import (
 
 const httpContextLogger = "tk-ctx-logger"
 
-// var httpRouterOnce sync.Once
+var httpEngineOnce sync.Once
 var httpEngine *gin.Engine = nil
-var httpRouter gin.IRouter
+var httpRouters = NewSyncMap[gin.IRouter](func(key string) (gin.IRouter, error) {
+	if key == "" || key == "/" {
+		return HttpEngine(), nil
+	} else {
+		return HttpEngine().Group(key), nil
+	}
+})
 var httpPort int
 var httpRequestPrefix []byte
 var httpRequestCounter uint64
 
 // HttpServerInit 默认的httpServer初始化
+// 必须在使用HttpStartServer()/HttpStartServerWithConfig()之前调用;
+// 如果CommandName是http/http_check，则会自动调用
 func HttpServerInit() {
 	HttpServerInitWithConfig(&Config.Http)
 }
 
 // HttpServerInitWithConfig httpServer初始化
+// 必须在使用HttpEngine()/HttpRouter()/HttpStartServer()/HttpStartServerWithConfig()之前调用
 func HttpServerInitWithConfig(httpConfig *HttpConfig) {
 	gin.DefaultWriter = Logger.Out()
 	gin.DefaultErrorWriter = Logger.Out()
@@ -39,28 +48,6 @@ func HttpServerInitWithConfig(httpConfig *HttpConfig) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	httpRequestPrefix = []byte(fmt.Sprintf("%d_", Pid))
-
-	httpEngine = gin.New()
-	var funcs []gin.HandlerFunc
-	funcs = append(funcs, func(c *gin.Context) {
-		c.Set(httpContextLogger, Logger.With(
-			loggerFieldId, httpIncrReqId(),
-			"ip", c.ClientIP(),
-			"path", c.Request.URL.Path,
-		))
-	})
-	if AppDebug {
-		funcs = append(funcs, gin.Logger())
-	}
-	funcs = append(funcs, httpErrorHandler)
-	httpEngine.Use(funcs...)
-
-	rootPath := strings.TrimSpace(httpConfig.RootPath)
-	if len(rootPath) == 0 || httpConfig.RootPath == "/" {
-		httpRouter = httpEngine
-	} else {
-		httpRouter = httpEngine.Group(rootPath)
-	}
 	Logger.Infof("HttpServerInitWithConfig finished-%d", httpConfig.Port)
 }
 
@@ -123,16 +110,38 @@ func HttpLogger(c *gin.Context) FieldLogger {
 
 // HttpEngine 获取gin.Engine
 func HttpEngine() *gin.Engine {
+	httpEngineOnce.Do(func() {
+		httpEngine = gin.New()
+		var funcs []gin.HandlerFunc
+		funcs = append(funcs, func(c *gin.Context) {
+			c.Set(httpContextLogger, Logger.With(
+				loggerFieldId, httpIncrReqId(),
+				"ip", c.ClientIP(),
+				"path", c.Request.URL.Path,
+			))
+		})
+		if AppDebug {
+			funcs = append(funcs, gin.Logger())
+		}
+		funcs = append(funcs, httpErrorHandler)
+		httpEngine.Use(funcs...)
+	})
 	return httpEngine
 }
 
-// HttpRouter 获取gin.IRouter
+// HttpRouter 获取默认配置路径的gin.IRouter
 func HttpRouter() gin.IRouter {
-	HttpEngine()
-	return httpRouter
+	r, _ := httpRouters.LoadOrCreate(Config.Http.RootPath)
+	return r
 }
 
-// HttpStartServerDefault 启动默认配置gin的http-server
+// HttpRouterWithPath 获取指定前缀路径的gin.Router
+func HttpRouterWithPath(relativePath string) gin.IRouter {
+	r, _ := httpRouters.LoadOrCreate(relativePath)
+	return r
+}
+
+// HttpStartServer 启动默认配置gin的http-server
 func HttpStartServer() {
 	HttpStartServerWithConfig(&Config.Http)
 }
