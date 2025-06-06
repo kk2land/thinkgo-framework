@@ -25,6 +25,8 @@ type HttpWsConnOnMessage func(wsConn *HttpWsConn, msg interface{}) error
 
 type HttpWsConnOnClose func(wsConn *HttpWsConn, from int, err error, writeNoNetErr func([]byte))
 
+type HttpWsConnWritePing func(conn *websocket.Conn) error
+
 var httpWsConnIdCounter atomic.Uint64
 var httpWsConnGroupIdCounter atomic.Uint64
 var httpWsConnPingInterval = 15 * time.Second
@@ -50,21 +52,27 @@ func httpWsConnOnMessage(wsConn *HttpWsConn, msg interface{}) error {
 
 func httpWsConnOnClose(wsConn *HttpWsConn, from int, err error, writeNoNetErr func([]byte)) {}
 
+func httpWsConnWritePing(conn *websocket.Conn) error {
+	return conn.WriteMessage(websocket.PingMessage, nil)
+}
+
 // HttpWsConn 封装的websocket connection
 type HttpWsConn struct {
-	logger         FieldLogger
-	router         *HttpWsRouter
-	conn           *websocket.Conn
-	connId         uint64
-	ctxLock        sync.RWMutex
-	ctx            map[string]interface{}
-	writeLock      sync.RWMutex
-	writeClosed    atomic.Bool
-	writeChannel   chan []byte
-	controlChannel chan interface{}
-	closeChannel   chan *httpWsConnCloseData
-	onMessage      HttpWsConnOnMessage
-	onClose        HttpWsConnOnClose
+	logger          FieldLogger
+	router          *HttpWsRouter
+	conn            *websocket.Conn
+	connId          uint64
+	ctxLock         sync.RWMutex
+	ctx             map[string]interface{}
+	writeLock       sync.RWMutex
+	writeClosed     atomic.Bool
+	writeChannel    chan []byte
+	controlChannel  chan interface{}
+	closeChannel    chan *httpWsConnCloseData
+	onMessage       HttpWsConnOnMessage
+	onClose         HttpWsConnOnClose
+	writePing       HttpWsConnWritePing
+	writePingCustom bool
 }
 
 func newHttpWsConn(logger FieldLogger, router *HttpWsRouter, c *gin.Context, conn *websocket.Conn) *HttpWsConn {
@@ -80,6 +88,7 @@ func newHttpWsConn(logger FieldLogger, router *HttpWsRouter, c *gin.Context, con
 		closeChannel:   make(chan *httpWsConnCloseData, 1),
 		onMessage:      httpWsConnOnMessage,
 		onClose:        httpWsConnOnClose,
+		writePing:      httpWsConnWritePing,
 	}
 	wsConn.ctx["RemoteAddr"] = c.Request.RemoteAddr
 	return wsConn
@@ -104,6 +113,11 @@ func (m *HttpWsConn) OnMessage(f HttpWsConnOnMessage) {
 
 func (m *HttpWsConn) OnClose(f HttpWsConnOnClose) {
 	m.onClose = f
+}
+
+func (m *HttpWsConn) WritePing(f HttpWsConnWritePing) {
+	m.writePing = f
+	m.writePingCustom = true
 }
 
 // CtxLoad 读取业务key/value
@@ -259,7 +273,7 @@ loop:
 			}
 
 		case <-tick.C:
-			if err := m.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			if err := m.writePing(m.conn); err != nil {
 				m.logger.Errorf("ping fail-%v", err)
 				m.onClose(m, HttpWsConnCloseFromPingErr, err, nil)
 				break loop
@@ -299,13 +313,26 @@ loop:
 }
 
 func (m *HttpWsConn) Start() error {
+	var err error
+	//设置读取超时时间
+	if err = m.conn.SetReadDeadline(time.Now().Add(httpWsConnReadDeadline)); err != nil {
+		m.logger.Errorf("SetReadDeadline fail - %s", err)
+		return err
+	}
+	//如果没有自定义writePing，则设置自动响应pong帧
+	if !m.writePingCustom {
+		m.conn.SetPongHandler(func(appData string) error {
+			return m.conn.SetReadDeadline(time.Now().Add(httpWsConnReadDeadline))
+		})
+	}
+
 	//启动write协程
 	go m.goWrite()
 
 	m.logger.Infof("开始ReadMessage")
-	var err error
 	var b []byte
 	var msg interface{}
+
 	for {
 		_, b, err = m.conn.ReadMessage()
 		if err != nil {
@@ -394,6 +421,7 @@ type HttpWsRouter struct {
 	keyConns         *CMap[string, *HttpWsConn]
 }
 
+// NewHttpWsRouter 先全局创建一个HttpWsRouter，然后使用它的Create()函数来获取HttpWsConn
 func NewHttpWsRouter(
 	writeChannelSize int,
 	marshal func(msg interface{}) ([]byte, error),
@@ -434,7 +462,7 @@ func (m *HttpWsRouter) Unmarshal(b []byte) (interface{}, error) {
 	return m.unmarshal(b)
 }
 
-// KeyConnBind 可以将wsConn绑定一个key，
+// KeyConnBind 可以将wsConn绑定一个key
 func (m *HttpWsRouter) KeyConnBind(key string, wsConn *HttpWsConn, replace bool) (swapped bool) {
 	if key1 := wsConn.Key(); key1 != "" && key1 != key {
 		//不支持对wsConn绑定不同的key
@@ -489,13 +517,6 @@ func (m *HttpWsRouter) Create(c *gin.Context) (*HttpWsConn, error) {
 		logger.Errorf("Upgrade fail - %s", err)
 		return nil, err
 	}
-	if err = conn.SetReadDeadline(time.Now().Add(httpWsConnReadDeadline)); err != nil {
-		logger.Errorf("SetReadDeadline fail - %s", err)
-		return nil, err
-	}
-	conn.SetPongHandler(func(appData string) error {
-		return conn.SetReadDeadline(time.Now().Add(httpWsConnReadDeadline))
-	})
 	wsConn := newHttpWsConn(logger, m, c, conn)
 	m.conns.Store(wsConn.connId, wsConn)
 	return wsConn, nil
