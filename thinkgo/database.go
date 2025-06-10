@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
+	"github.com/mattn/go-sqlite3"
 	_ "github.com/mattn/go-sqlite3"
 	"sync"
 	"time"
@@ -14,18 +16,84 @@ import (
 
 // DBErrRetry 判断err是否是可以重试的错误
 func DBErrRetry(err error) bool {
+	//判断是socket超时 or socket关闭
 	if ErrIsTimeout(err) || ErrIsBrokenPipe(err) {
 		return true
 	}
+	//判断是不合法的连接
 	s := err.Error()
 	if s == "invalid connection" {
 		return true
 	}
-	if mysqlErr, ok := err.(*mysql.MySQLError); ok {
-		switch mysqlErr.Number {
-		//1213 = deadlock
-		case 2002, 2006, 2013, 1213:
-			return true
+	//mysql
+	{
+		var e *mysql.MySQLError
+		if errors.As(err, &e) {
+			switch e.Number {
+			//1213 = ER_LOCK_DEADLOCK
+			//1205 = ER_LOCK_WAIT_TIMEOUT
+			//2006 = CR_SERVER_GONE_ERROR
+			//2013 = CR_SERVER_LOST
+			//1047 = ER_UNKNOWN_COM_ERROR
+			//1158–1161 = 网络相关错误（如 ER_NET_READ_ERROR）
+			case 1213, 1205, 2002, 2006, 2013, 1047, 1158, 1159, 1160, 1161:
+				return true
+			}
+		}
+	}
+	//postgresql
+	{
+		var e *pq.Error
+		if errors.As(err, &e) {
+			switch e.Code {
+			//40001 = serialization_failure
+			//40P01 = deadlock_detected
+			//55P03 = lock_not_available
+			//57014 = query_canceled
+			//08000 = connection_exception
+			//08001 = sqlclient_unable_to_establish_sqlconnection
+			//08003 = connection_does_not_exist
+			//08006 = connection_failure
+			case "40001", "40P01", "55P03", "57014", "08000", "08001", "08003", "08006":
+				return true
+			}
+		}
+	}
+	//sqlite3
+	{
+		var e sqlite3.Error
+		if errors.As(err, &e) {
+			switch {
+			case errors.Is(e.Code, sqlite3.ErrBusy), errors.Is(e.Code, sqlite3.ErrLocked):
+				return true
+			case errors.Is(e.ExtendedCode, sqlite3.ErrBusySnapshot), errors.Is(e.ExtendedCode, sqlite3.ErrLockedSharedCache):
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func DBErrDuplicate(err error) bool {
+	//mysql
+	{
+		var e *mysql.MySQLError
+		if errors.As(err, &e) {
+			return e.Number == 1062
+		}
+	}
+	//postgresql
+	{
+		var e *pq.Error
+		if errors.As(err, &e) {
+			return e.Code == "23505"
+		}
+	}
+	//sqlite3
+	{
+		var e sqlite3.Error
+		if errors.As(err, &e) {
+			return errors.Is(e.ExtendedCode, sqlite3.ErrConstraintUnique)
 		}
 	}
 	return false
