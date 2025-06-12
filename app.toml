@@ -41,6 +41,7 @@ driverSourceName = "{user}:{password}@tcp({address}:{port})/{database}?charset=u
 connMaxLifetime = "xxs"     # maximum amount of time a connection may be reused. <0则不会关闭
 connMaxIdleTime = "xxs"     # the maximum amount of time a connection may be idle. <0则不会管理
 maxOpenConns = 10           # 连接池大小
+maxIdleConns = 2            # 空闲连接的最大个数，默认2，<0则没有空闲连接
 
 [database.default.cmd_maxOpenConns]     # 对特定的command，配置不同的连接池大小
 

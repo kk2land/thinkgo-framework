@@ -185,7 +185,9 @@ func dbCreate(name string) (*DBInstance, error) {
 		db.IsCluster = true
 	}
 	db.Name = name
-	db.SetMaxIdleConns(0)
+	if config.MaxIdleConns != 0 {
+		db.SetMaxIdleConns(config.MaxIdleConns)
+	}
 	if config.getMaxOpenConns() > 0 {
 		db.SetMaxOpenConns(config.getMaxOpenConns())
 	}

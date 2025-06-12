@@ -68,6 +68,7 @@ type dbConfig struct {
 	ConnMaxLifetime   ConversionDuration
 	ConnMaxIdleTime   ConversionDuration
 	MaxOpenConns      int
+	MaxIdleConns      int
 	Cmd2MaxOpenConns  map[string]int `toml:"cmd_maxOpenConns"`
 }
 
