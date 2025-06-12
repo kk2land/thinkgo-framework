@@ -185,11 +185,12 @@ func dbCreate(name string) (*DBInstance, error) {
 		db.IsCluster = true
 	}
 	db.Name = name
-	if config.MaxIdleConns != 0 {
-		db.SetMaxIdleConns(config.MaxIdleConns)
+	options := config.getOptions()
+	if options.MaxIdleConns != 0 {
+		db.SetMaxIdleConns(options.MaxIdleConns)
 	}
-	if config.getMaxOpenConns() > 0 {
-		db.SetMaxOpenConns(config.getMaxOpenConns())
+	if options.MaxOpenConns > 0 {
+		db.SetMaxOpenConns(options.MaxOpenConns)
 	}
 	if config.ConnMaxLifetime != 0 {
 		db.SetConnMaxLifetime(config.ConnMaxLifetime.Duration())

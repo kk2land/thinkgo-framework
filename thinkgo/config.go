@@ -61,23 +61,26 @@ func (c redisConfig) getOptions() redisOptionConfig {
 	return c.redisOptionConfig
 }
 
+type dbOptionConfig struct {
+	MaxOpenConns int
+	MaxIdleConns int
+}
+
 type dbConfig struct {
 	DriverName        string
 	DriverSourceName  string
 	DriverSourceNames []string
 	ConnMaxLifetime   ConversionDuration
 	ConnMaxIdleTime   ConversionDuration
-	MaxOpenConns      int
-	MaxIdleConns      int
-	Cmd2MaxOpenConns  map[string]int `toml:"cmd_maxOpenConns"`
+	dbOptionConfig
+	CmdOptions map[string]dbOptionConfig `toml:"cmd_options"`
 }
 
-func (c dbConfig) getMaxOpenConns() int {
-	if v, ok := c.Cmd2MaxOpenConns[CommandName]; ok {
-		return v
-	} else {
-		return c.MaxOpenConns
+func (c dbConfig) getOptions() dbOptionConfig {
+	if optConfig, ok := c.CmdOptions[CommandName]; ok {
+		return optConfig
 	}
+	return c.dbOptionConfig
 }
 
 func initAppConfig() (*appConfig, error) {
