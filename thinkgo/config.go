@@ -121,6 +121,8 @@ func initAppConfig() (*appConfig, error) {
 						val = AppStatus
 					case "CommandName":
 						val = CommandName
+					case "Hostname":
+						val = Hostname
 					default:
 						val = os.Getenv(key)
 					}
