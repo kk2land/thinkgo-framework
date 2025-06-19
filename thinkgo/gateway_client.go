@@ -46,7 +46,7 @@ const (
 	gatewayProtocolCmdSendToOne   = 5
 	gatewayProtocolCmdSendToAll   = 6
 	gatewayProtocolCmdSendToUID   = 14
-	gatewayProtocolCmdSendToGroup = 21
+	gatewayProtocolCmdSendToGroup = 22
 )
 
 type gatewayProtocol struct {
