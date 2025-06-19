@@ -253,6 +253,7 @@ loop:
 				var deletes []string
 				for k, conn := range conns {
 					Logger.Debugf("GatewayClient::goGateway,send-%s", k)
+					_ = conn.SetWriteDeadline(time.Now().Add(m.timeout))
 					if _, err := conn.Write(b); err != nil {
 						addFailCount(k, err)
 						deletes = append(deletes, k)
