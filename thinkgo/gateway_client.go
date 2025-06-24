@@ -191,7 +191,7 @@ func (m *GatewayClient) goGateway() {
 		count := failCounts[address]
 		count++
 		failCounts[address] = count
-		if count%20 == 1 {
+		if count%20 == 5 {
 			OpsAlarm("GatewayClient连接gateway进程失败,err=%v,次数=%d", err, count)
 		}
 	}
