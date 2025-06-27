@@ -93,7 +93,7 @@ func (m *gatewayProtocol) encode() []byte {
 	return buf
 }
 
-// GatewayClient 连接php的WorkerMan的gateway，想其发送消息
+// GatewayClient 连接php的WorkerMan的gateway，向其发送消息
 type GatewayClient struct {
 	concurrency         int
 	registerAddress     string

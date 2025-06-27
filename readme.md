@@ -26,6 +26,62 @@ go get git.hy545.cc/crypto/thinkgo-framework
   - app/config/{module}/config/app.toml
   - app/config/{module}/config/app_{_TK_AppStatus}.toml
 
+### http服务使用
+
+{package}/handler_http.go
+```go
+var _ = thinkgo.HttpRouter().GET("/", func(c *gin.Context) {
+    c.JSON(200, gin.H{
+        "code": 0,
+        "msg":  "succ",
+        "data": map[string]interface{} {
+        },
+    })
+})
+```
+
+main.go
+```go
+import _ "{package}"
+```
+
+### websocket服务使用
+
+{package}/handler_ws.go
+```go
+
+var wsRouter = thinkgo.NewHttpWsRouter(
+	10, //写入队列长度
+	func(msg interface{}) ([]byte, error) { //消息序列化
+		return json.Marshal(msg)
+	},
+	func(b []byte) (interface{}, error) { //消息反序列化
+		var msg *wsMessage
+		if err := json.Unmarshal(b, &msg); err != nil {
+			return nil, err
+		}
+		return msg, nil
+	},
+)
+
+var _ = thinkgo.HttpRouter().GET("/ws", func(c *gin.Context) {
+    conn, err := wsRouter.Create(c)
+    if err != nil {
+        return
+    }
+    conn.OnMessage(func(wsConn *thinkgo.HttpWsConn, msg interface{}) error {
+		//do something
+        return nil
+    })
+    _ = conn.Start()
+})
+
+```
+
+### redis使用
+
+todo
+
 ### 数据库使用
 
 数据库直接使用的[xorm](https://xorm.io/zh/docs/)，举个例子：
@@ -44,7 +100,7 @@ func (m *MyStudent) TableName() string {
 	return "student"
 }
 
-db := thinkgo.DBDefaultOrPanic()
+db := thinkgo.DBDefaultOrPanic() //获取default配置的数据库对象
 
 // 插入
 studentA := &MyStudent{
