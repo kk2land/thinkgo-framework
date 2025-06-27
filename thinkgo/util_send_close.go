@@ -12,16 +12,18 @@ type SendClose struct {
 	flag atomic.Bool
 }
 
-func (m *SendClose) SendWithRLock(f func()) {
+func (m *SendClose) SendWithRLock(f func()) bool {
 	if m.flag.Load() {
-		return
+		return false
 	}
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
 	if !m.flag.Load() {
 		f()
+		return true
 	}
+	return false
 }
 
 func (m *SendClose) Close(wait *sync.WaitGroup, f func()) {
