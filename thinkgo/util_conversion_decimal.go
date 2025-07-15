@@ -82,6 +82,6 @@ func (m *ConversionDecimal) ToDB() ([]byte, error) {
 	if m != nil {
 		return []byte(m.String()), nil
 	} else {
-		return []byte{}, nil
+		return nil, nil
 	}
 }
