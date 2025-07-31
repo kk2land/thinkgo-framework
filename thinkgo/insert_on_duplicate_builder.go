@@ -7,9 +7,9 @@ import (
 // InsertOnDuplicateBuilder 构建mysql的insert on duplicate key update的批量操作
 type InsertOnDuplicateBuilder struct {
 	cols     int
-	sql1     string
-	sql2     string
-	sql3     string
+	sql1     string // "insert into xxx(...) values"
+	sql2     string // "(?,?,...)"
+	sql3     string // " on duplicate key update `col`=values(`col`)"
 	capacity int
 	sql      *strings.Builder
 	args     []interface{}
@@ -61,6 +61,7 @@ func (m *InsertOnDuplicateBuilder) InitArgs(capacity int) {
 	m.capacity = capacity
 	//构建sql
 	m.sql = &strings.Builder{}
+	// len("insert into xxx(...) values") + capacity * len("(?,?,...)") + (capacity - 1) * len(",") + len(" on duplicate key update ...")
 	m.sql.Grow(len(m.sql1) + len(m.sql2)*capacity + capacity - 1 + len(m.sql3))
 	m.sql.WriteString(m.sql1)
 	//构建参数
