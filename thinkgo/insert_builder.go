@@ -29,7 +29,7 @@ func NewInsertBuilder(
 	default:
 		op = "insert"
 	}
-	sql1 := op + " into `" + tableName + "`(`" + strings.Join(cols, "`,`") + "`) values"
+	sql1 := op + " into " + tableName + "(`" + strings.Join(cols, "`,`") + "`) values"
 	//第二部分
 	var sql2 string
 	{

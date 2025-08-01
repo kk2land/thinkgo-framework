@@ -21,7 +21,7 @@ func NewInsertOnDuplicateBuilder(
 	keyNum int, //前几列是key
 ) *InsertOnDuplicateBuilder {
 	//第一部分
-	sql1 := "insert into `" + tableName + "`(`" + strings.Join(cols, "`,`") + "`) values"
+	sql1 := "insert into " + tableName + "(`" + strings.Join(cols, "`,`") + "`) values"
 	//第二部分
 	var sql2 string
 	{
