@@ -209,7 +209,8 @@ func AddStartHook(h func()) {
 	startHooks.mu.Lock()
 	defer startHooks.mu.Unlock()
 	if startHooks.done {
-		panic(errors.New("server已经启动，不能再AddStartHook"))
+		h()
+		return
 	}
 	startHooks.hooks = append(startHooks.hooks, h)
 }
@@ -226,6 +227,7 @@ func CallStartHooks() {
 		h()
 	}
 	startHooks.done = true
+	startHooks.hooks = nil
 }
 
 // AddShutdownHook 添加服务停止时的回调
@@ -233,7 +235,7 @@ func AddShutdownHook(h func(wait *sync.WaitGroup)) {
 	shutdownHooks.mu.Lock()
 	defer shutdownHooks.mu.Unlock()
 	if shutdownHooks.done {
-		panic(errors.New("server已经启动，不能再AddShutdownHook"))
+		panic(errors.New("server已经停止，不能再AddShutdownHook"))
 	}
 	shutdownHooks.hooks = append(shutdownHooks.hooks, h)
 }
@@ -252,6 +254,7 @@ func CallShutdownHooks() {
 	}
 	wait.Wait()
 	shutdownHooks.done = true
+	shutdownHooks.hooks = nil
 	Logger.Infof("CallShutdownHooks finished")
 }
 
