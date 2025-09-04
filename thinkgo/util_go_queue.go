@@ -46,6 +46,14 @@ func (g *GoQueue) Start() {
 	}()
 }
 
+func (g *GoQueue) TrySend(obj interface{}) {
+	if atomic.LoadInt32(&g.state) != 2 {
+		select {
+		case g.ch <- obj:
+		}
+	}
+}
+
 func (g *GoQueue) Send(obj interface{}) {
 	if atomic.LoadInt32(&g.state) != 2 {
 		defer func() {

@@ -185,7 +185,7 @@ func OpsAlarmWithGroup(group string, format string, v ...interface{}) {
 	}
 	buf.WriteByte(' ')
 	buf.WriteString(fmt.Sprintf(format, v...))
-	opsAlarmGoQueue.Send(buf.String())
+	opsAlarmGoQueue.TrySend(buf.String())
 }
 
 // WritePidFile 写当前进程的pid文件
