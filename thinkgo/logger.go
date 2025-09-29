@@ -121,6 +121,8 @@ type FieldLogger interface {
 
 	Out() io.Writer
 	IsDebug() bool
+	SetLevel(level logrus.Level)
+	SetOutput(output io.Writer)
 }
 
 func iniAppLogger(name string) FieldLogger {
@@ -184,6 +186,14 @@ func (l *loggerLogrus) IsDebug() bool {
 	return l.Level >= logrus.DebugLevel
 }
 
+func (l *loggerLogrus) SetLevel(level logrus.Level) {
+	l.Logger.SetLevel(level)
+}
+
+func (l *loggerLogrus) SetOutput(output io.Writer) {
+	l.Logger.SetOutput(output)
+}
+
 type loggerLogrusEntry struct {
 	*logrus.Entry
 }
@@ -221,6 +231,14 @@ func (l *loggerLogrusEntry) Out() io.Writer {
 
 func (l *loggerLogrusEntry) IsDebug() bool {
 	return l.Entry.Level >= logrus.DebugLevel
+}
+
+func (l *loggerLogrusEntry) SetLevel(level logrus.Level) {
+	//do nothing
+}
+
+func (l *loggerLogrusEntry) SetOutput(output io.Writer) {
+	//do nothing
 }
 
 type loggerLogrusFormat struct{}
