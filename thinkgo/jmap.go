@@ -46,10 +46,10 @@ func JInt(i interface{}) (int64, bool) {
 	if i != nil {
 		switch d := i.(type) {
 		case string:
-			if j, err := strconv.Atoi(d); err != nil {
+			if j, err := strconv.ParseInt(d, 10, 64); err != nil {
 				return 0, false
 			} else {
-				return int64(j), true
+				return j, true
 			}
 		case int64:
 			return d, true
