@@ -116,7 +116,7 @@ func init() {
 	}
 	//初始化日志配置
 	Logger = iniAppLogger(Config.CmdLogNames[CommandName])
-	Logger.Infof("AppStatus = %s, AppDebug = %t", AppStatus, AppDebug)
+	Logger.Infof("AppStatus = %s, _TK_AppDebug = %t", AppStatus, AppDebug)
 
 	opsAlarmGoQueue = NewGoQueue(10, func(obj interface{}) {
 		var err error
