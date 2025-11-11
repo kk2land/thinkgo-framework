@@ -268,24 +268,15 @@ func bytesTrimQuote(b []byte) []byte {
 	return b
 }
 
-// TruncateBigFloat 对*big.Float按照精度四舍五入 factor = math.Pow10(precision)
-func TruncateBigFloat(f *big.Float, factor *big.Float) *big.Float {
-	val := new(big.Float).Mul(f, factor)
+// TruncateBigFloat 对*big.Float按照精度四舍五入 scale = math.Pow10(precision)
+func TruncateBigFloat(f *big.Float, scale *big.Float) *big.Float {
+	val := new(big.Float).Mul(f, scale)
 	// 四舍五入：tmp + 0.5，然后取整
 	val.Add(val, Float0_5)
 	intPart, _ := val.Int(nil) // 去掉小数部分
-	// 转回浮点数：intPart / factor
+	// 转回浮点数：intPart / scale
 	val.SetInt(intPart)
-	return val.Quo(val, factor)
-}
-
-// FloorBigFloat 对*big.Float按照精度向下对齐 factor = math.Pow10(precision)
-func FloorBigFloat(f *big.Float, factor *big.Float) *big.Float {
-	val := new(big.Float).Mul(f, factor)
-	i, _ := val.Int(nil)
-	val.SetInt(i)
-	val.Quo(val, factor)
-	return val
+	return val.Quo(val, scale)
 }
 
 // TruncateFloat64 对float64按照精度四舍五入
