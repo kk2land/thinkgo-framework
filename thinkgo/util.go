@@ -204,8 +204,9 @@ func UnsafeBytesToStr(b []byte) string {
 
 // NginxHash nginx的upstream指定的hash一致的算法
 // https://nginx.org/en/docs/http/ngx_http_upstream_module.html#hash
-func NginxHash(key string, num int) int {
-	return int((Crc32(key)>>16)&0x7fff) % num
+// server的配置: weight=1(默认); max_conns=0(默认,不限制); max_fails=0(非默认,不限制); 没有down;
+func NginxHash(key string, num int) uint32 {
+	return ((Crc32(key) >> 16) & 0x7fff) % uint32(num)
 }
 
 // SafeGo 安全启动协程，panic时会告警，并且shouldPanic控制是否会panic
