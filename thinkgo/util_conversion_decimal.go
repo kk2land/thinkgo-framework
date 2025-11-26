@@ -60,7 +60,7 @@ func (m *ConversionDecimal) UnmarshalJSON(b []byte) error {
 	if bytes.Equal(b, ConversionJsonNull) {
 		return nil
 	}
-	return m.FromDB(bytesTrimQuote(b))
+	return m.FromDB(JsonBytesTrimQuote(b))
 }
 
 func (m ConversionDecimal) MarshalJSON() ([]byte, error) {

@@ -257,13 +257,10 @@ func SortMap[K comparable, V any](m map[K]V, less func(keys []K, i, j int) bool)
 	return ret
 }
 
-func bytesTrimQuote(b []byte) []byte {
+func JsonBytesTrimQuote(b []byte) []byte {
 	if len(b) > 0 {
-		if b[0] == '"' {
-			return bytes.Trim(b, "\"")
-		}
-		if b[0] == '\'' {
-			return bytes.Trim(b, "'")
+		if b[0] == '"' || b[0] == '\'' {
+			return b[1 : len(b)-1]
 		}
 	}
 	return b

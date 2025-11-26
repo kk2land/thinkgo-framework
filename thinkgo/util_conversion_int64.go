@@ -41,7 +41,7 @@ func (m *ConversionInt64) UnmarshalJSON(b []byte) error {
 	if bytes.Equal(b, ConversionJsonNull) {
 		return nil
 	}
-	b = bytesTrimQuote(b)
+	b = JsonBytesTrimQuote(b)
 	if i, err := ParseConversionInt64(string(b)); err != nil {
 		return err
 	} else {

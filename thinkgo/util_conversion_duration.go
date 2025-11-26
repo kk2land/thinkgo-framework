@@ -48,8 +48,7 @@ func (m *ConversionDuration) UnmarshalJSON(b []byte) error {
 	if bytes.Equal(b, ConversionJsonNull) {
 		return nil
 	}
-	b = bytesTrimQuote(b)
-	return m.FromDB(b)
+	return m.FromDB(JsonBytesTrimQuote(b))
 }
 
 func (m ConversionDuration) MarshalJSON() ([]byte, error) {
