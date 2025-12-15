@@ -55,11 +55,12 @@ func NewInsertOnDuplicateBuilder(
 		tmp2 := make([]string, 0, len(cols)-keyNum)
 		for i, col := range cols {
 			if i < keyNum {
-				tmp1 = append(tmp1, col)
+				tmp1 = append(tmp1, "\""+col+"\"")
 			} else {
 				tmp2 = append(tmp2, fmt.Sprintf("\"%s\"=excluded.\"%s\"", col, col))
 			}
 		}
+		sql3 = " on conflict(" + strings.Join(tmp1, ",") + ") do update set " + strings.Join(tmp2, ",")
 	} else {
 		//mysql
 		tmp := make([]string, 0, len(cols)-keyNum)
