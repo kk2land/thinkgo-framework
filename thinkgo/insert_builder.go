@@ -26,7 +26,11 @@ func NewInsertBuilder(
 	var op string
 	switch mode {
 	case 1:
-		op = "insert ignore"
+		if driver == "postgres" {
+			op = "insert"
+		} else {
+			op = "insert ignore"
+		}
 	case 2:
 		op = "replace"
 	default:
@@ -58,7 +62,7 @@ func NewInsertBuilder(
 	}
 	//第三部分
 	var sql3 string
-	if driver == "postgres" {
+	if mode == 1 && driver == "postgres" {
 		sql3 = " on conflict do nothing"
 	}
 	return &InsertBuilder{
