@@ -93,10 +93,10 @@ func (m *InsertOnDuplicateBuilder) InitArgs(capacity int) {
 
 func (m *InsertOnDuplicateBuilder) AppendArgs(rowIdx int, args ...interface{}) {
 	//构建sql
-	m.sql.WriteString(m.sql2)
-	if rowIdx < m.capacity-1 {
+	if rowIdx > 0 {
 		m.sql.WriteByte(',')
 	}
+	m.sql.WriteString(m.sql2)
 	//构建参数
 	j := rowIdx*m.cols + 1
 	for k, arg := range args {
