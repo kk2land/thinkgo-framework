@@ -1,6 +1,7 @@
 package thinkgo
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -9,7 +10,7 @@ type InsertOnDuplicateBuilder struct {
 	cols     int
 	sql1     string // "insert into xxx(...) values"
 	sql2     string // "(?,?,...)"
-	sql3     string // " on duplicate key update `col`=values(`col`)"
+	sql3     string // " on duplicate key update `col`=values(`col`)" or " on conflict(...) do update set `col`=excluded.`col`"
 	capacity int
 	sql      *strings.Builder
 	args     []interface{}
@@ -17,12 +18,20 @@ type InsertOnDuplicateBuilder struct {
 }
 
 func NewInsertOnDuplicateBuilder(
+	driver string,
 	tableName string,
 	cols []string,
 	keyNum int, //前几列是key
 ) *InsertOnDuplicateBuilder {
 	//第一部分
-	sql1 := "insert into " + tableName + "(`" + strings.Join(cols, "`,`") + "`) values"
+	var colsStr string
+	switch driver {
+	case "postgres":
+		colsStr = "\"" + strings.Join(cols, "\",\"") + "\""
+	default:
+		colsStr = "`" + strings.Join(cols, "`,`") + "`"
+	}
+	sql1 := "insert into " + tableName + "(" + colsStr + ") values"
 	//第二部分
 	var sql2 string
 	{
@@ -40,13 +49,25 @@ func NewInsertOnDuplicateBuilder(
 	}
 	//第三部分
 	var sql3 string
-	{
-		tmp := make([]string, len(cols)-keyNum)
+	if driver == "postgres" {
+		//pgsql
+		tmp1 := make([]string, 0, keyNum)
+		tmp2 := make([]string, 0, len(cols)-keyNum)
+		for i, col := range cols {
+			if i < keyNum {
+				tmp1 = append(tmp1, col)
+			} else {
+				tmp2 = append(tmp2, fmt.Sprintf("\"%s\"=excluded.\"%s\"", col, col))
+			}
+		}
+	} else {
+		//mysql
+		tmp := make([]string, 0, len(cols)-keyNum)
 		for i, col := range cols {
 			if i < keyNum {
 				continue
 			}
-			tmp[i-keyNum] = "`" + col + "`=values(`" + col + "`)"
+			tmp = append(tmp, "`"+col+"`=values(`"+col+"`)")
 		}
 		sql3 = " on duplicate key update " + strings.Join(tmp, ",")
 	}

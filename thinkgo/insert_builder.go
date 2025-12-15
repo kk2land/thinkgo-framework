@@ -9,6 +9,7 @@ type InsertBuilder struct {
 	cols     int
 	sql1     string // "insert/replace [ignore] into xxx(...) values"
 	sql2     string // "(?,?,...)"
+	sql3     string // pgsql=" on conflict do nothing"
 	capacity int
 	sql      *strings.Builder
 	args     []interface{}
@@ -17,6 +18,7 @@ type InsertBuilder struct {
 
 func NewInsertBuilder(
 	mode int, //0=普通insert; 1=insert ignore; 2=replace;
+	driver string,
 	tableName string,
 	cols []string,
 ) *InsertBuilder {
@@ -30,7 +32,15 @@ func NewInsertBuilder(
 	default:
 		op = "insert"
 	}
-	sql1 := op + " into " + tableName + "(`" + strings.Join(cols, "`,`") + "`) values"
+
+	var colsStr string
+	switch driver {
+	case "postgres":
+		colsStr = "\"" + strings.Join(cols, "\",\"") + "\""
+	default:
+		colsStr = "`" + strings.Join(cols, "`,`") + "`"
+	}
+	sql1 := op + " into " + tableName + "(" + colsStr + ") values"
 	//第二部分
 	var sql2 string
 	{
@@ -46,10 +56,16 @@ func NewInsertBuilder(
 		tmp.WriteByte(')')
 		sql2 = tmp.String()
 	}
+	//第三部分
+	var sql3 string
+	if driver == "postgres" {
+		sql3 = " on conflict do nothing"
+	}
 	return &InsertBuilder{
 		cols: len(cols),
 		sql1: sql1,
 		sql2: sql2,
+		sql3: sql3,
 	}
 }
 
@@ -58,7 +74,7 @@ func (m *InsertBuilder) InitArgs(capacity int) {
 	//构建sql
 	m.sql = &strings.Builder{}
 	// len("insert into xxx(...) values") + capacity * len("(?,?,...)") + (capacity - 1) * len(",")
-	m.sql.Grow(len(m.sql1) + len(m.sql2)*capacity + capacity - 1)
+	m.sql.Grow(len(m.sql1) + len(m.sql2)*capacity + len(m.sql3) + capacity - 1)
 	m.sql.WriteString(m.sql1)
 	//构建参数
 	m.args = make([]interface{}, capacity*m.cols+1)
@@ -80,6 +96,7 @@ func (m *InsertBuilder) AppendArgs(rowIdx int, args ...interface{}) {
 
 func (m *InsertBuilder) TakeArgs() (ret []interface{}) {
 	//第一个参数是sql
+	m.sql.WriteString(m.sql3)
 	m.args[0] = m.sql.String()
 	m.sql = nil
 	if len(m.args) == m.argsIdx {
