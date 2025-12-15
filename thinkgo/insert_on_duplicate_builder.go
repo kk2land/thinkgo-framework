@@ -13,6 +13,7 @@ type InsertOnDuplicateBuilder struct {
 	capacity int
 	sql      *strings.Builder
 	args     []interface{}
+	argsIdx  int
 }
 
 func NewInsertOnDuplicateBuilder(
@@ -68,25 +69,31 @@ func (m *InsertOnDuplicateBuilder) InitArgs(capacity int) {
 	m.args = make([]interface{}, capacity*m.cols+1)
 }
 
-func (m *InsertOnDuplicateBuilder) AppendArgs(i int, args ...interface{}) {
+func (m *InsertOnDuplicateBuilder) AppendArgs(rowIdx int, args ...interface{}) {
 	//构建sql
 	m.sql.WriteString(m.sql2)
-	if i < m.capacity-1 {
+	if rowIdx < m.capacity-1 {
 		m.sql.WriteByte(',')
 	}
 	//构建参数
-	j := i*m.cols + 1
+	j := rowIdx*m.cols + 1
 	for k, arg := range args {
 		m.args[j+k] = arg
 	}
+	m.argsIdx = j + m.cols
 }
 
-func (m *InsertOnDuplicateBuilder) TakeArgs() []interface{} {
+func (m *InsertOnDuplicateBuilder) TakeArgs() (ret []interface{}) {
 	//第一个参数是sql
 	m.sql.WriteString(m.sql3)
 	m.args[0] = m.sql.String()
 	m.sql = nil
-	ret := m.args
+	if m.argsIdx == len(m.args) {
+		//表示args的空间都已经铺满
+		ret = m.args
+	} else {
+		ret = m.args[0:m.argsIdx]
+	}
 	m.args = nil
 	return ret
 }
