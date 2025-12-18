@@ -16,10 +16,6 @@ writeTimeout = "xxs"    # 写入超时时间
 idleTimeout = "xxs"     # http开启KeepAlive时，连接等待下个请求请求超过该值，则关闭连接
 maxHeaderBytes = 0      # http请求头的最大字节数
 
-[grpc]
-authenticationEnable = false    # 是否开启默认的权限校验
-authenticationKey = "..."       # 默认权限校验的key
-
 [redis]
 [redis.default]         # 必须有个default的配置
 addr = "address:port"   # redis的地址

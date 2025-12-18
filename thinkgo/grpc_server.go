@@ -8,153 +8,61 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"net/http"
-	"net/url"
-	"path/filepath"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 )
 
-const grpcMetaDataAuthentication = "tk-authorization"
+type GrpcBeforeCreate func() []grpc.ServerOption
 
-var grpcServerOnce sync.Once
-var grpcServer *grpc.Server = nil
+type GrpcAfterCreate func(server *grpc.Server)
 
-type grpcStatusErr struct {
-	code codes.Code
-	msg  string
+type GrpcErrorHandler func(ctx context.Context, r interface{}) error
+
+type GrpcErrorStatus struct {
+	code    codes.Code
+	message string
 }
 
-func (err *grpcStatusErr) GRPCStatus() *status.Status {
-	return status.New(err.code, err.msg)
+func (err *GrpcErrorStatus) GRPCStatus() *status.Status {
+	return status.New(err.code, err.message)
 }
 
-func (err *grpcStatusErr) Error() string {
-	return err.msg
+func (err *GrpcErrorStatus) Error() string {
+	return err.message
 }
 
-func grpcGetValue(m map[string][]string, k string) (string, bool) {
-	if val, ok := m[k]; ok && len(val) > 0 {
-		return val[0], true
-	} else {
-		return "", false
-	}
-}
+var (
+	grpcBeforeCreateRef atomic.Value
+	grpcAfterCreateRef  atomic.Value
+	grpcErrorHandlerRef atomic.Value
+)
 
-func GrpcLogger(ctx context.Context) FieldLogger {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return Logger
-	}
-	var reqid string
-	if reqid, ok = grpcGetValue(md, loggerFieldId); !ok {
-		return Logger
-	}
-	return Logger.With(loggerFieldId, reqid)
-}
-
-func grpcAuthentication(ctx context.Context, fullMethod string) error {
-	logger := GrpcLogger(ctx)
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		logger.Warnf("metadata.FromIncomingContext fail")
-		return status.Errorf(codes.Unauthenticated, "Authentication error")
-	}
-
-	var auth string
-	if auth, ok = grpcGetValue(md, grpcMetaDataAuthentication); !ok {
-		logger.Warnf("gRPC校验,metadata[%s]为空", grpcMetaDataAuthentication)
-		return status.Errorf(codes.Unauthenticated, "Authentication empty")
-	}
-	var host string
-	if host, ok = grpcGetValue(md, ":authority"); !ok {
-		logger.Warnf("gRPC校验,metadata[:authority]为空")
-		return status.Errorf(codes.Unauthenticated, "Authentication empty authority")
-	}
-	host = strings.SplitN(host, ":", 2)[0]
-
-	q, err := url.ParseQuery(auth)
-	if err != nil {
-		logger.Warnf("gRPC校验,auth字符串格式不对-%s", auth)
-		return status.Errorf(codes.Unauthenticated, "Authentication invalid")
-	}
-	appid, ok1 := grpcGetValue(q, "appid")
-	nonce, ok2 := grpcGetValue(q, "nonce")
-	time1, ok3 := grpcGetValue(q, "time")
-	sign, ok4 := grpcGetValue(q, "sign")
-	if !ok1 || !ok2 || !ok3 || !ok4 {
-		logger.Warnf("gRPC校验,auth字符串格式不对,appid/nonce/time/sign存在空-%s", auth)
-		return status.Errorf(codes.Unauthenticated, "Authentication invalid")
-	}
-	path := filepath.Dir(fullMethod)
-	//"appid={$appid}nonce={$nonce}time={$time}url={$host}{$path}{$key}";
-	buf := strings.Builder{}
-	buf.WriteString("appid=")
-	buf.WriteString(appid)
-	buf.WriteString("nonce=")
-	buf.WriteString(nonce)
-	buf.WriteString("time=")
-	buf.WriteString(time1)
-	buf.WriteString("url=")
-	buf.WriteString(host)
-	buf.WriteString(path)
-	buf.WriteString(Config.Grpc.AuthenticationKey)
-	if Md5(buf.String()) != sign {
-		logger.Warnf("gRPC校验,校验失败,str=%s,sign=%s", buf.String(), sign)
-		return status.Errorf(codes.Unauthenticated, "Authentication fail")
-	}
-	return nil
-}
-
-func grpcLoggerError(ctx context.Context, err interface{}) error {
+func grpcHandleError(ctx context.Context, r interface{}) error {
 	stack := Stack(4, 5)
-	logger := GrpcLogger(ctx)
-	logger.Errorf("[GrpcHandleError] err=%s\n%s", err, stack)
-	var msg string
-	var code = codes.Unknown
-	if !AppDebug {
-		if apiErr, ok := err.(*ApiError); ok {
-			msg = apiErr.apiMessage
-			if apiErr.code != 0 {
-				code = codes.Code(apiErr.code)
-			}
-		} else {
-			msg = "internal error"
-		}
+	if ErrIsBrokenPipe(r) {
+		return nil
+	}
+	GrpcLogger(ctx).Errorf("[GrpcHandleError] err=%v\n%s", r, stack)
+
+	if errorHandler := grpcErrorHandlerRef.Load(); errorHandler != nil {
+		return errorHandler.(GrpcErrorHandler)(ctx, r)
 	} else {
-		msg = fmt.Sprintf("%s\n%s", err, stack)
-	}
-	return &grpcStatusErr{code: code, msg: msg}
-}
-
-func grpcAuthUnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (obj interface{}, err error) {
-	if err = grpcAuthentication(ctx, info.FullMethod); err != nil {
-		return
-	}
-	defer func() {
-		if err1 := recover(); err1 != nil {
-			err = grpcLoggerError(ctx, err1)
+		var code = codes.Unknown
+		var message string
+		if !AppDebug {
+			message = "internal error"
+		} else {
+			message = fmt.Sprintf("%v\n%s", r, stack)
 		}
-	}()
-	return handler(ctx, req)
-}
-
-func grpcAuthStreamServerInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
-	if err = grpcAuthentication(ss.Context(), info.FullMethod); err != nil {
-		return
+		return &GrpcErrorStatus{code: code, message: message}
 	}
-	defer func() {
-		if err1 := recover(); err1 != nil {
-			err = grpcLoggerError(ss.Context(), err1)
-		}
-	}()
-	return handler(srv, ss)
 }
 
 func grpcErrUnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (obj interface{}, err error) {
 	defer func() {
-		if err1 := recover(); err1 != nil {
-			err = grpcLoggerError(ctx, err1)
+		if r := recover(); r != nil {
+			err = grpcHandleError(ctx, r)
 		}
 	}()
 	return handler(ctx, req)
@@ -162,83 +70,59 @@ func grpcErrUnaryServerInterceptor(ctx context.Context, req interface{}, info *g
 
 func grpcErrStreamServerInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 	defer func() {
-		if err1 := recover(); err1 != nil {
-			err = grpcLoggerError(ss.Context(), err1)
+		if r := recover(); r != nil {
+			err = grpcHandleError(ss.Context(), r)
 		}
 	}()
 	return handler(srv, ss)
 }
 
-//func GrpcEnable() bool {
-//	switch CommandName {
-//	case CommandNameHttp:
-//		return Config.Http.WithGrpc
-//	case CommandNameGrpc:
-//		return true
-//	}
-//	return false
-//}
-
-// GrpcServer 获取GrpcServer
-func GrpcServer() *grpc.Server {
-	grpcServerOnce.Do(func() {
-		//todo 读取配置初始化server
-		var opts []grpc.ServerOption
-		if Config.Grpc.AuthenticationEnable {
-			if len(Config.Grpc.AuthenticationKey) == 0 {
-				panic(fmt.Errorf("config[grpc][authenticationEnable]开启时，config[grpc][authenticationKey]不能为空"))
-			}
-			opts = append(opts,
-				grpc.UnaryInterceptor(grpcAuthUnaryServerInterceptor),
-				grpc.StreamInterceptor(grpcAuthStreamServerInterceptor))
-		} else {
-			opts = append(opts,
-				grpc.UnaryInterceptor(grpcErrUnaryServerInterceptor),
-				grpc.StreamInterceptor(grpcErrStreamServerInterceptor))
-		}
-		grpcServer = grpc.NewServer(opts...)
-	})
-	return grpcServer
+func GrpcOnBeforeCreate(f GrpcBeforeCreate) {
+	grpcBeforeCreateRef.Store(f)
 }
 
-func grpcHandleError(logger FieldLogger, w http.ResponseWriter, r *http.Request, err interface{}) {
-	stack := Stack(4, 5)
-	brokenPipe := ErrIsBrokenPipe(err)
-	var msg = "internal error"
-	logger.Errorf("[GrpcHandleError] err=%s\n%s", err, stack)
-	if AppDebug {
-		msg = fmt.Sprintf("%s\n%s", err, stack)
+func GrpcOnAfterCreate(f GrpcAfterCreate) {
+	grpcAfterCreateRef.Store(f)
+}
+
+func GrpcCreateServer() *grpc.Server {
+	var opts []grpc.ServerOption
+	opts = append(opts,
+		grpc.UnaryInterceptor(grpcErrUnaryServerInterceptor),
+		grpc.StreamInterceptor(grpcErrStreamServerInterceptor))
+	if f := grpcBeforeCreateRef.Load(); f != nil {
+		opts = append(opts, f.(GrpcBeforeCreate)()...)
 	}
-	if !brokenPipe {
-		var ret = "0"
-		if !AppDebug {
-			if apiErr, ok := err.(*ApiError); ok {
-				ret = fmt.Sprintf("%d", apiErr.code)
-				msg = apiErr.apiMessage
-			}
-		}
-		w.Header().Set("Content-Type", "application/grpc+proto")
-		w.Header().Set("grpc-status", ret)
-		w.Header().Set("grpc-message", url.QueryEscape(msg))
-		w.WriteHeader(200)
+	server := grpc.NewServer(opts...)
+	if f := grpcAfterCreateRef.Load(); f != nil {
+		f.(GrpcAfterCreate)(server)
 	}
+	return server
+}
+
+// GrpcLogger 从请求context.Context中获取日志对象
+func GrpcLogger(ctx context.Context) FieldLogger {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return Logger
+	}
+	var reqID string
+	if val, ok := md[loggerFieldId]; !ok || len(val) == 0 {
+		return Logger
+	} else {
+		reqID = val[0]
+	}
+	return Logger.With(loggerFieldId, reqID)
 }
 
 func grpcHttpHandler(elseHandler http.Handler) http.Handler {
-	var server = GrpcServer()
+	server := GrpcCreateServer()
 	f := func(w http.ResponseWriter, r *http.Request) {
 		if r.ProtoMajor == 2 && strings.HasPrefix(r.Header.Get("Content-Type"), "application/grpc") {
-			reqId := httpIncrReqId()
-			logger := Logger.With(
-				loggerFieldId, reqId,
-				"ip", ClientIp(r),
-				"path", r.URL.Path,
-			)
+			reqID := httpRequestId()
+			logger := Logger.With(loggerFieldId, reqID, "ip", ClientIp(r), "path", r.URL.Path)
 			start := time.Now()
 			defer func() {
-				if err := recover(); err != nil {
-					grpcHandleError(logger, w, r, err)
-				}
 				if AppDebug {
 					code := w.Header().Get("grpc-status")
 					if len(code) == 0 {
@@ -247,7 +131,7 @@ func grpcHttpHandler(elseHandler http.Handler) http.Handler {
 					logger.Debugf("[GRPC] %s | %s", code, time.Now().Sub(start))
 				}
 			}()
-			r.Header.Set(loggerFieldId, reqId)
+			r.Header.Set(loggerFieldId, reqID)
 			server.ServeHTTP(w, r)
 		} else {
 			elseHandler.ServeHTTP(w, r)

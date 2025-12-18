@@ -1,6 +1,7 @@
 package thinkgo
 
 import (
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -17,6 +18,9 @@ import (
 
 const httpContextLogger = "tk-ctx-logger"
 
+// HttpErrorHandler http的默认panic处理函数，需要对客户端返回进行处理
+type HttpErrorHandler func(c *gin.Context, err interface{})
+
 var httpEngineOnce sync.Once
 var httpEngine *gin.Engine = nil
 var httpRouters = NewSyncMap[gin.IRouter](func(key string) (gin.IRouter, error) {
@@ -27,76 +31,43 @@ var httpRouters = NewSyncMap[gin.IRouter](func(key string) (gin.IRouter, error) 
 	}
 })
 var httpPort int
-var httpRequestPrefix []byte
-var httpRequestCounter uint64
+var httpRequestIdCounter atomic.Uint64
+var httpErrorHandlerRef atomic.Value
 
-// httpInitServer 默认的httpServer初始化
-// 必须在使用HttpStartServer()/HttpStartServerWithConfig()之前调用;
-// 如果CommandName是http/http_check，则会自动调用
-func httpInitServer() {
-	httpInitServerWithConfig(&Config.Http)
+func httpRequestId() string {
+	id := httpRequestIdCounter.Add(1)
+	return strconv.Itoa(Pid) + "_" + strconv.FormatUint(id, 10)
 }
 
-// httpInitServerWithConfig httpServer初始化
-// 必须在使用HttpEngine()/HttpRouter()/HttpStartServer()/HttpStartServerWithConfig()之前调用
-func httpInitServerWithConfig(httpConfig *HttpConfig) {
-	gin.DefaultWriter = Logger.Out()
-	gin.DefaultErrorWriter = Logger.Out()
-	if AppDebug {
-		gin.SetMode(gin.DebugMode)
-	} else {
-		gin.SetMode(gin.ReleaseMode)
-	}
-	httpRequestPrefix = []byte(fmt.Sprintf("%d_", Pid))
-	Logger.Infof("httpInitServerWithConfig finished-%d", httpConfig.Port)
-}
-
-func httpIncrReqId() string {
-	id := atomic.AddUint64(&httpRequestCounter, 1)
-	return string(strconv.AppendUint(httpRequestPrefix, id, 10))
-}
-
-func httpErrorHandler(c *gin.Context) {
+func httpMiddlewareHandleError(c *gin.Context) {
 	defer func() {
-		err := recover()
-		if err == nil {
+		r := recover()
+		if r == nil {
 			return
 		}
-		logger := HttpLogger(c)
-		brokenPipe := ErrIsBrokenPipe(err)
-		msg := "internal error"
 		stack := Stack(3, 5)
-
-		var noStack = false
-		var apiErr *ApiError = nil
-		if apiError, ok := err.(*ApiError); ok && !AppDebug {
-			noStack = apiError.noStack
-		}
-		if !noStack {
-			logger.Errorf("[HttpErrorHandler] err=%s\n%s", err, stack)
-		} else {
-			logger.Errorf("[HttpErrorHandler] err=%s", err)
-		}
-		if AppDebug {
-			msg = fmt.Sprintf("%s\n%s", err, stack)
-		}
-		if brokenPipe {
-			_ = c.Error(err.(error)) // nolint: errcheck
+		if ErrIsBrokenPipe(r) {
+			_ = c.Error(r.(error)) // nolint: errcheck
 			c.Abort()
 		} else {
-			var ret = "0"
-			if !AppDebug && apiErr != nil {
-				ret = fmt.Sprintf("%d", apiErr.code)
-				msg = apiErr.apiMessage
+			HttpLogger(c).Errorf("[HttpErrorHandler] err=%s\n%s", r, stack)
+			if errorHandler := httpErrorHandlerRef.Load(); errorHandler != nil {
+				errorHandler.(HttpErrorHandler)(c, r)
+			} else {
+				if !AppDebug {
+					_ = c.AbortWithError(599, errors.New("internal error"))
+				} else {
+					msg := fmt.Sprintf("%v\n%s", r, stack)
+					_ = c.AbortWithError(599, errors.New(msg))
+				}
 			}
-			c.AbortWithStatusJSON(http.StatusOK, gin.H{
-				"ret":     ret,
-				"msg":     msg,
-				"content": gin.H{},
-			})
 		}
 	}()
 	c.Next()
+}
+
+func HttpSetErrorHandler(errorHandler HttpErrorHandler) {
+	httpErrorHandlerRef.Store(errorHandler)
 }
 
 // HttpLogger 基于gin.Context获取当前请求的日志对象
@@ -111,19 +82,24 @@ func HttpLogger(c *gin.Context) FieldLogger {
 // HttpEngine 获取gin.Engine
 func HttpEngine() *gin.Engine {
 	httpEngineOnce.Do(func() {
+		gin.DefaultWriter = Logger.Out()
+		gin.DefaultErrorWriter = Logger.Out()
+		if AppDebug {
+			gin.SetMode(gin.DebugMode)
+		} else {
+			gin.SetMode(gin.ReleaseMode)
+		}
 		httpEngine = gin.New()
 		var funcs []gin.HandlerFunc
 		funcs = append(funcs, func(c *gin.Context) {
 			c.Set(httpContextLogger, Logger.With(
-				loggerFieldId, httpIncrReqId(),
-				"ip", c.ClientIP(),
-				"path", c.Request.URL.Path,
+				loggerFieldId, httpRequestId(), "ip", c.ClientIP(), "path", c.Request.URL.Path,
 			))
 		})
 		if AppDebug {
 			funcs = append(funcs, gin.Logger())
 		}
-		funcs = append(funcs, httpErrorHandler)
+		funcs = append(funcs, httpMiddlewareHandleError)
 		httpEngine.Use(funcs...)
 	})
 	return httpEngine
@@ -148,8 +124,6 @@ func HttpStartServer() {
 
 // HttpStartServerWithConfig 启动gin的http-server
 func HttpStartServerWithConfig(httpConfig *HttpConfig) {
-	httpInitServerWithConfig(httpConfig)
-
 	port := httpConfig.Port
 	if port <= 0 {
 		envPort := os.Getenv(envKeyInternalHttpPort)
@@ -160,8 +134,11 @@ func HttpStartServerWithConfig(httpConfig *HttpConfig) {
 			}
 		}
 	}
+	Logger.Infof("HttpStartServerWithConfig port=%d", httpConfig.Port)
+
 	var handler http.Handler
 	if httpConfig.WithGrpc {
+		//todo 配置grpc
 		handler = grpcHttpHandler(HttpEngine())
 	} else {
 		handler = HttpEngine()

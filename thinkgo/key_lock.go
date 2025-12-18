@@ -3,19 +3,24 @@ package thinkgo
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync/atomic"
 	"time"
 )
 
 // 对某个key来上锁，KeyLockMem=基于内存map；KeyLockRedis=基于redis；
 
-var keyLockErrPrefix = "keyLock失败"
+type keyLockError struct {
+	message string
+}
+
+func (m *keyLockError) Error() string {
+	return m.message
+}
 
 type KeyLockHandler func() interface{}
 
 func KeyLockErrLockedFail(err interface{}) bool {
-	if apiError, ok := err.(*ApiError); ok && strings.HasPrefix(apiError.message, keyLockErrPrefix) {
+	if _, ok := err.(*keyLockError); ok {
 		return true
 	}
 	return false
@@ -88,7 +93,7 @@ func KeyLockMemTimeout(key string, timeout time.Duration, f KeyLockHandler) inte
 	case <-t.C:
 		break
 	}
-	panic(NewApiError1f("请求失败", "%s,key=%s", keyLockErrPrefix, key))
+	panic(&keyLockError{"keyLock失败,key=" + key})
 }
 
 // KeyLockRedis start
@@ -165,13 +170,9 @@ func (l *KeyLockRedis) LockTimeout(key string, timeout time.Duration, f KeyLockH
 	if _, err := p.Exec(context.Background()); err != nil {
 		panic(err)
 	} else {
-		var outMsg string
-		if ttl, err := res1.Result(); err == nil {
-			outMsg = fmt.Sprintf("请求失败,请%d秒后重试", ttl.Seconds())
-		} else {
-			outMsg = "请求失败"
-		}
-		panic(NewApiError1f(outMsg, "%s,key=%s,left=%s,val=%s", keyLockErrPrefix, key, res1.Val(), res2.Val()))
+		panic(&keyLockError{
+			message: fmt.Sprintf("keyLock失败,key=%s,left=%s,val=%s", key, res1.Val(), res2.Val()),
+		})
 	}
 }
 
@@ -231,5 +232,7 @@ func (l *KeyLockMySQL) LockTimeout(key string, timeout time.Duration, f KeyLockH
 		}()
 		return f()
 	}
-	panic(NewApiError1f("请求失败", "%s,key=%s", keyLockErrPrefix, key))
+	panic(&keyLockError{
+		message: fmt.Sprintf("keyLock失败,key=%s", key),
+	})
 }

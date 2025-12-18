@@ -16,7 +16,6 @@ type appConfig struct {
 	OpsAlarm    string            `toml:"ops_alarm"`
 	CmdLogNames map[string]string `toml:"cmd_logNames"`
 	Http        HttpConfig
-	Grpc        grpcConfig
 	Redis       map[string]redisConfig
 	DB          map[string]dbConfig `toml:"database"`
 	Custom      JMap
@@ -30,11 +29,6 @@ type HttpConfig struct {
 	WriteTimeout   ConversionDuration
 	IdleTimeout    ConversionDuration
 	MaxHeaderBytes int
-}
-
-type grpcConfig struct {
-	AuthenticationEnable bool
-	AuthenticationKey    string
 }
 
 type redisOptionConfig struct {
