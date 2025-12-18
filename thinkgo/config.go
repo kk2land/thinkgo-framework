@@ -24,7 +24,6 @@ type appConfig struct {
 type HttpConfig struct {
 	Port           int
 	WithGrpc       bool
-	RootPath       string
 	ReadTimeout    ConversionDuration
 	WriteTimeout   ConversionDuration
 	IdleTimeout    ConversionDuration

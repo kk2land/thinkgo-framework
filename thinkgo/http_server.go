@@ -21,18 +21,22 @@ const httpContextLogger = "tk-ctx-logger"
 // HttpErrorHandler http的默认panic处理函数，需要对客户端返回进行处理
 type HttpErrorHandler func(c *gin.Context, err interface{})
 
-var httpEngineOnce sync.Once
-var httpEngine *gin.Engine = nil
-var httpRouters = NewSyncMap[gin.IRouter](func(key string) (gin.IRouter, error) {
-	if key == "" || key == "/" {
-		return HttpEngine(), nil
-	} else {
-		return HttpEngine().Group(key), nil
-	}
-})
-var httpPort int
-var httpRequestIdCounter atomic.Uint64
-var httpErrorHandlerRef atomic.Value
+var (
+	httpEngineOnce sync.Once
+	httpEngine     *gin.Engine = nil
+	httpRouters                = NewSyncMap[gin.IRouter](func(key string) (gin.IRouter, error) {
+		if key == "" || key == "/" {
+			return HttpEngine(), nil
+		} else {
+			return HttpEngine().Group(key), nil
+		}
+	})
+
+	httpRootPath         atomic.Value
+	httpPort             atomic.Int32
+	httpRequestIdCounter atomic.Uint64
+	httpErrorHandlerRef  atomic.Value
+)
 
 func httpRequestId() string {
 	id := httpRequestIdCounter.Add(1)
@@ -107,8 +111,7 @@ func HttpEngine() *gin.Engine {
 
 // HttpRouter 获取默认配置路径的gin.IRouter
 func HttpRouter() gin.IRouter {
-	r, _ := httpRouters.LoadOrCreate(Config.Http.RootPath)
-	return r
+	return HttpEngine()
 }
 
 // HttpRouterWithPath 获取指定前缀路径的gin.Router
@@ -175,5 +178,5 @@ func HttpWebsocketUpgrade(c *gin.Context) (*websocket.Conn, error) {
 
 // HttpPort 获取当前http-server的端口
 func HttpPort() int {
-	return httpPort
+	return int(httpPort.Load())
 }

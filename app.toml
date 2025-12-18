@@ -10,7 +10,6 @@ ops_alarm = ""          # 告警的对象
 [http]
 port = 8082             # http服务端口，如果是0，则将随机端口
 withGrpc = false        # 是否开启grpc
-rootPath = ""           # http请求path的前缀路径，默认空字符串
 readTimeout = "xxs"     # 读取超时时间，单位支持："ms", "s", "m", "h"
 writeTimeout = "xxs"    # 写入超时时间
 idleTimeout = "xxs"     # http开启KeepAlive时，连接等待下个请求请求超过该值，则关闭连接

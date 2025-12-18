@@ -281,12 +281,12 @@ func StartHttpServer(
 	//对于随机端口，获取port
 	server.BeforeBegin = func(add string) {
 		if port == 0 {
-			httpPort = server.EndlessListener.Addr().(*net.TCPAddr).Port
+			httpPort.Store(int32(server.EndlessListener.Addr().(*net.TCPAddr).Port))
 		} else {
-			httpPort = port
+			httpPort.Store(int32(port))
 		}
-		_ = os.Setenv(envKeyInternalHttpPort, strconv.Itoa(httpPort))
-		Logger.Infof("[StartHttpServer]开始启动httpserver - %d", httpPort)
+		_ = os.Setenv(envKeyInternalHttpPort, strconv.Itoa(HttpPort()))
+		Logger.Infof("[StartHttpServer]开始启动httpserver - %d", HttpPort())
 		if err := WritePidFile(); err != nil {
 			Logger.Errorf("[StartHttpServer]写入pidfile失败 - %s", err)
 			panic(err)
