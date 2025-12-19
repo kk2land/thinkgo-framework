@@ -185,6 +185,9 @@ func OpsAlarmWithGroup(group string, format string, v ...interface{}) {
 	}
 	buf.WriteByte(' ')
 	buf.WriteString(fmt.Sprintf(format, v...))
+	if buf.Len() > 1024 {
+		buf.Truncate(1024)
+	}
 	opsAlarmGoQueue.TrySend(buf.String())
 }
 
