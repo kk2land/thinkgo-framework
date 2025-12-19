@@ -4,6 +4,12 @@ import (
 	"strings"
 )
 
+type InsertBuilderInterface interface {
+	InitArgs(capacity int)
+	AppendArgs(rowIdx int, args ...interface{})
+	TakeArgs() (ret []interface{})
+}
+
 // InsertBuilder 构建mysql的insert ignore的批量操作
 type InsertBuilder struct {
 	cols     int
@@ -17,7 +23,7 @@ type InsertBuilder struct {
 }
 
 func NewInsertBuilder(
-	mode int, //0=普通insert; 1=insert ignore; 2=replace;
+	mode int, //0=普通insert; 1=insert ignore; 2=replace(mysql);
 	driver string,
 	tableName string,
 	cols []string,
