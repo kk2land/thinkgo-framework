@@ -81,13 +81,13 @@ func GetAppConfigPath(fileName string) string {
 	if InModule {
 		return filepath.Join(RootPath, "app", "config", fileName)
 	} else {
-		return filepath.Join(ConfigPath, fileName)
+		return filepath.Join(configPath, fileName)
 	}
 }
 
 // GetConfigPath 获取 app/config or app/{module}/config目录下配置文件路径
 func GetConfigPath(fileName string) string {
-	return filepath.Join(ConfigPath, fileName)
+	return filepath.Join(configPath, fileName)
 }
 
 func initAppConfig() (*appConfig, error) {
@@ -99,9 +99,9 @@ func initAppConfig() (*appConfig, error) {
 		files = append(files, filepath.Join(RootPath, "app", "config", "app_"+AppStatus+".toml"))
 	}
 	if InModule {
-		files = append(files, filepath.Join(ConfigPath, "app.toml"))
+		files = append(files, filepath.Join(configPath, "app.toml"))
 		if len(AppStatus) > 0 {
-			files = append(files, filepath.Join(ConfigPath, "app_"+AppStatus+".toml"))
+			files = append(files, filepath.Join(configPath, "app_"+AppStatus+".toml"))
 		}
 	}
 

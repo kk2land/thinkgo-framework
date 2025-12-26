@@ -34,11 +34,11 @@ var (
 	InModule    bool   //是否在module下启动
 	RootPath    string //项目根路径
 	AppPath     string //应用路径 = app or app/{module}
-	ConfigPath  string //配置路径 = app/config or app/{module}/config
+	configPath  string //配置路径 = app/config or app/{module}/config
 	RuntimePath string //运行时文件路径 = app/runtime or app/{module}/runtime
 
 	CommandName string //当前启动的二进制名
-	AppName     string //从配置中读取的应用名 config.AppName or config.AppName+"-"+ModuleName
+	AppName     string //从配置中读取的应用名 config.AppName
 	AppStatus   string //环境变量或.env文件读取的_TK_AppStatus，用来判断app运行环境
 	AppDebug    bool   //是否是调试模式允许，Logger.Debug(f)会打印出来，从配置文件读取
 	Hostname    string //当前主机的hostname
@@ -109,11 +109,7 @@ func init() {
 		AppDebug = envAppDebug == "1"
 	}
 
-	if InModule {
-		AppName = Config.AppName + "-" + ModuleName
-	} else {
-		AppName = Config.AppName
-	}
+	AppName = Config.AppName
 	//初始化日志配置
 	Logger = iniAppLogger(Config.CmdLogNames[CommandName])
 	Logger.Infof("AppStatus = %s, _TK_AppDebug = %t", AppStatus, AppDebug)
@@ -155,9 +151,9 @@ func initPathVars(dir string) error {
 	if !IsDir(AppPath) {
 		return fmt.Errorf("app path not dir - %s", AppPath)
 	}
-	ConfigPath = filepath.Join(AppPath, "config")
-	if !IsDir(ConfigPath) {
-		return fmt.Errorf("config path not dir - %s", ConfigPath)
+	configPath = filepath.Join(AppPath, "config")
+	if !IsDir(configPath) {
+		return fmt.Errorf("config path not dir - %s", configPath)
 	}
 	RuntimePath = filepath.Join(AppPath, "runtime")
 	if !IsDir(RuntimePath) {
