@@ -38,7 +38,7 @@ var (
 	RuntimePath string //运行时文件路径 = app/runtime or app/{module}/runtime
 
 	CommandName string //当前启动的二进制名
-	AppName     string //从配置中读取的应用名
+	AppName     string //从配置中读取的应用名 config.AppName or config.AppName+"-"+ModuleName
 	AppStatus   string //环境变量或.env文件读取的_TK_AppStatus，用来判断app运行环境
 	AppDebug    bool   //是否是调试模式允许，Logger.Debug(f)会打印出来，从配置文件读取
 	Hostname    string //当前主机的hostname

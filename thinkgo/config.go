@@ -76,6 +76,20 @@ func (c dbConfig) getOptions() dbOptionConfig {
 	return c.dbOptionConfig
 }
 
+// GetAppConfigPath 获取 app/config目录下的配置文件路径
+func GetAppConfigPath(fileName string) string {
+	if InModule {
+		return filepath.Join(RootPath, "app", "config", fileName)
+	} else {
+		return filepath.Join(ConfigPath, fileName)
+	}
+}
+
+// GetConfigPath 获取 app/config or app/{module}/config目录下配置文件路径
+func GetConfigPath(fileName string) string {
+	return filepath.Join(ConfigPath, fileName)
+}
+
 func initAppConfig() (*appConfig, error) {
 	c := new(appConfig)
 
