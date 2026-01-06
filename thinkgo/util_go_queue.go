@@ -37,7 +37,7 @@ func (g *GoQueue) Start() {
 				if obj == nil {
 					break loop
 				}
-				g.goHandle(obj)
+				g.doHandle(obj)
 			}
 		}
 		if wait := g.waitRef.Swap(nil); wait != nil {
@@ -79,10 +79,10 @@ func (g *GoQueue) CloseAndWait(wait *sync.WaitGroup) {
 	}
 }
 
-func (g *GoQueue) goHandle(obj interface{}) {
+func (g *GoQueue) doHandle(obj interface{}) {
 	defer func() {
 		if err := recover(); err != nil {
-			Logger.Errorf("[GoQueue] goHandle fail - %s", err)
+			Logger.Errorf("[GoQueue] doHandle fail - %s", err)
 		}
 	}()
 	g.handler(obj)

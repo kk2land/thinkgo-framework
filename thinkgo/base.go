@@ -204,6 +204,7 @@ func OpsAlarmWithGroup(group string, format string, v ...interface{}) {
 	if queue := opsAlarmQueueRef.Load(); queue != nil {
 		queue.TrySend(buf.String())
 	} else {
+		//如果是命令行运行，则直接调用发送错误
 		queue = &opsAlarmQueue{}
 		queue.directSend(buf.String())
 		if queue.opsAlarmSyslog != nil {
@@ -241,9 +242,9 @@ func AddStartHook(h func()) {
 
 // CallStartHooks 触发http-server等服务启动时的回调，以下使用情景自动有效
 //
-//	thinkgo.StartHttpServer
-//	thinkgo.ListenShutdownSignals
-//	thinkgo.HttpStartServer
+//	StartHttpServer
+//	ListenShutdownSignals
+//	HttpStartServer
 func CallStartHooks() {
 	startHooks.mu.Lock()
 	defer startHooks.mu.Unlock()
@@ -266,9 +267,9 @@ func AddShutdownHook(h func(wait *sync.WaitGroup)) {
 
 // CallShutdownHooks 触发服务停止时的回调，以下使用情景自动有效
 //
-//	thinkgo.StartHttpServer
-//	thinkgo.ListenShutdownSignals
-//	thinkgo.HttpStartServer
+//	StartHttpServer
+//	ListenShutdownSignals
+//	HttpStartServer
 func CallShutdownHooks() {
 	shutdownHooks.mu.Lock()
 	defer shutdownHooks.mu.Unlock()
