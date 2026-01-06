@@ -210,28 +210,38 @@ func NginxHash(key string, num int) uint32 {
 }
 
 // SafeGo 安全启动协程，panic时会告警，并且shouldPanic控制是否会panic
+// shouldPanic，发生panic时，是否终止终止进程
 func SafeGo(shouldPanic bool, f func()) {
+	SafeGo1(shouldPanic, true, f)
+}
+
+// SafeGo1 安全启动协程，panic时会告警，并且shouldPanic控制是否会panic
+// shouldPanic，发生panic时，是否终止终止进程
+// skipChannelClosed是否跳过"send on closed channel"错误
+func SafeGo1(shouldPanic, skipChannelClosed bool, f func()) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				//如果send一个已经被关闭的channel，则只是写错误日志
-				if err, ok := r.(error); ok && err.Error() == "send on closed channel" {
-					Logger.Error(err.Error())
-					stack := Stack(3, 5)
-					Logger.Errorf("stack=%s", stack)
+				if skipChannelClosed {
+					//跳过：send一个已经被关闭的channel的错误
+					if err, ok := r.(error); ok && err.Error() == "send on closed channel" {
+						Logger.Error(err.Error())
+						stack := Stack(3, 5)
+						Logger.Errorf("stack=%s", stack)
+						return
+					}
+				}
+				var hint string
+				if shouldPanic {
+					hint = "退出"
 				} else {
-					var hit string
-					if shouldPanic {
-						hit = "退出"
-					} else {
-						hit = "错误"
-					}
-					OpsAlarmWithGroup(Config.OpsAlarm, shouldPanic, "%s 协程panic%s-%v", AppName, hit, r)
-					stack := Stack(3, 5)
-					Logger.Errorf("stack=%s", stack)
-					if shouldPanic {
-						panic(r)
-					}
+					hint = "错误"
+				}
+				OpsAlarmWithGroup(Config.OpsAlarm, shouldPanic, "%s 协程panic%s-%v", AppName, hint, r)
+				stack := Stack(3, 5)
+				Logger.Errorf("stack=%s", stack)
+				if shouldPanic {
+					panic(r)
 				}
 			}
 		}()
