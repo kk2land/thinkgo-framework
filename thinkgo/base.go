@@ -181,11 +181,15 @@ func initPathVars(dir string) error {
 
 // OpsAlarm 进行tg告警，要依赖运维部署环境
 func OpsAlarm(format string, v ...interface{}) {
-	OpsAlarmWithGroup(Config.OpsAlarm, format, v...)
+	OpsAlarmWithGroup(Config.OpsAlarm, false, format, v...)
+}
+
+func OpsAlarmDirect(format string, v ...interface{}) {
+	OpsAlarmWithGroup(Config.OpsAlarm, true, format, v...)
 }
 
 // OpsAlarmWithGroup 进行tg告警，可以指定告警组
-func OpsAlarmWithGroup(group string, format string, v ...interface{}) {
+func OpsAlarmWithGroup(group string, direct bool, format string, v ...interface{}) {
 	Logger.Errorf(format, v...)
 	buf := BytesBuffer1024.Get()
 	defer BytesBuffer1024.Put(buf)
@@ -201,15 +205,23 @@ func OpsAlarmWithGroup(group string, format string, v ...interface{}) {
 	if buf.Len() > 1024 {
 		buf.Truncate(1024)
 	}
-	if queue := opsAlarmQueueRef.Load(); queue != nil {
-		queue.TrySend(buf.String())
-	} else {
-		//如果是命令行运行，则直接调用发送错误
-		queue = &opsAlarmQueue{}
-		queue.directSend(buf.String())
-		if queue.opsAlarmSyslog != nil {
-			_ = queue.opsAlarmSyslog.Close()
-		}
+
+	var queue *opsAlarmQueue
+	if direct {
+		goto direct
+	}
+	if queue = opsAlarmQueueRef.Load(); queue == nil {
+		goto direct
+	}
+	queue.TrySend(buf.String())
+	return
+
+direct:
+	//如果是命令行运行，则直接调用发送错误
+	queue = &opsAlarmQueue{}
+	queue.directSend(buf.String())
+	if queue.opsAlarmSyslog != nil {
+		_ = queue.opsAlarmSyslog.Close()
 	}
 }
 

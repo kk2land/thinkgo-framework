@@ -226,7 +226,7 @@ func SafeGo(shouldPanic bool, f func()) {
 					} else {
 						hit = "错误"
 					}
-					OpsAlarm("%s 协程panic%s-%v", AppName, hit, r)
+					OpsAlarmWithGroup(Config.OpsAlarm, shouldPanic, "%s 协程panic%s-%v", AppName, hit, r)
 					stack := Stack(3, 5)
 					Logger.Errorf("stack=%s", stack)
 					if shouldPanic {
