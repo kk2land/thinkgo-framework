@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 )
 
@@ -47,8 +48,7 @@ var (
 	Config *appConfig  //当前应用的配置对象
 	Logger FieldLogger //当前应用的logger对象
 
-	opsAlarmGoQueue *GoQueue
-	opsAlarmSyslog  *syslog.Writer = nil
+	opsAlarmQueueRef atomic.Pointer[opsAlarmQueue]
 )
 
 func init() {
@@ -114,25 +114,42 @@ func init() {
 	Logger = iniAppLogger(Config.CmdLogNames[CommandName])
 	Logger.Infof("AppStatus = %s, _TK_AppDebug = %t", AppStatus, AppDebug)
 
-	opsAlarmGoQueue = NewGoQueue(10, func(obj interface{}) {
-		var err error
-		if opsAlarmSyslog == nil {
-			if opsAlarmSyslog, err = syslog.New(syslog.LOG_ERR|syslog.LOG_LOCAL6, AppName); err != nil {
-				Logger.Errorf("opsAlarmSyslog new fail,err=%s", err)
-				return
-			}
-		}
-		str := obj.(string)
-		if err = opsAlarmSyslog.Err(str); err != nil {
-			Logger.Errorf("opsAlarmSyslog write fail,err=%s,str=%s", err, str)
-			_ = opsAlarmSyslog.Close()
-			opsAlarmSyslog = nil
-			return
+	AddStartHook(func() {
+		queue := &opsAlarmQueue{}
+		queue.GoQueue = NewGoQueue(10, func(obj interface{}) {
+			queue.directSend(obj.(string))
+		})
+		queue.Start()
+		opsAlarmQueueRef.Store(queue)
+	})
+	AddShutdownHook(func(wait *sync.WaitGroup) {
+		if queue := opsAlarmQueueRef.Load(); queue != nil {
+			queue.CloseAndWait(wait)
 		}
 	})
-	opsAlarmGoQueue.Start()
 
 	initRedis()
+}
+
+type opsAlarmQueue struct {
+	*GoQueue
+	opsAlarmSyslog *syslog.Writer
+}
+
+func (m *opsAlarmQueue) directSend(s string) {
+	var err error
+	if m.opsAlarmSyslog == nil {
+		if m.opsAlarmSyslog, err = syslog.New(syslog.LOG_ERR|syslog.LOG_LOCAL6, AppName); err != nil {
+			Logger.Errorf("opsAlarmSyslog new fail,err=%s", err)
+			return
+		}
+	}
+	if err = m.opsAlarmSyslog.Err(s); err != nil {
+		Logger.Errorf("opsAlarmSyslog write fail,err=%s,str=%s", err, s)
+		_ = m.opsAlarmSyslog.Close()
+		m.opsAlarmSyslog = nil
+		return
+	}
 }
 
 func initPathVars(dir string) error {
@@ -184,7 +201,15 @@ func OpsAlarmWithGroup(group string, format string, v ...interface{}) {
 	if buf.Len() > 1024 {
 		buf.Truncate(1024)
 	}
-	opsAlarmGoQueue.TrySend(buf.String())
+	if queue := opsAlarmQueueRef.Load(); queue != nil {
+		queue.TrySend(buf.String())
+	} else {
+		queue = &opsAlarmQueue{}
+		queue.directSend(buf.String())
+		if queue.opsAlarmSyslog != nil {
+			_ = queue.opsAlarmSyslog.Close()
+		}
+	}
 }
 
 // WritePidFile 写当前进程的pid文件

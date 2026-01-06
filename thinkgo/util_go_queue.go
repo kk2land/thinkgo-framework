@@ -9,8 +9,8 @@ import (
 type GoQueue struct {
 	ch      chan interface{}
 	state   int32
-	wait    *sync.WaitGroup
-	handler func(obj interface{})
+	waitRef atomic.Pointer[sync.WaitGroup]
+	handler func(obj interface{}) //保证单协程中运行
 }
 
 func NewGoQueue(size int, handler func(obj interface{})) *GoQueue {
@@ -40,8 +40,8 @@ func (g *GoQueue) Start() {
 				g.goHandle(obj)
 			}
 		}
-		if g.wait != nil {
-			g.wait.Done()
+		if wait := g.waitRef.Swap(nil); wait != nil {
+			wait.Done()
 		}
 	}()
 }
@@ -73,18 +73,11 @@ func (g *GoQueue) CloseAndWait(wait *sync.WaitGroup) {
 	if atomic.CompareAndSwapInt32(&g.state, 1, 2) {
 		if wait != nil {
 			wait.Add(1)
-			g.wait = wait
+			g.waitRef.Store(wait)
 		}
 		close(g.ch)
 	}
 }
-
-//func (g *GoQueue) CloseAndWait() {
-//	if atomic.CompareAndSwapInt32(&g.state, 1, 2) {
-//		close(g.done)
-//		g.wait.Wait()
-//	}
-//}
 
 func (g *GoQueue) goHandle(obj interface{}) {
 	defer func() {
