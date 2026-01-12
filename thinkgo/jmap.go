@@ -190,6 +190,32 @@ func (m JMap) GetArr(key string) ([]interface{}, bool) {
 	return nil, false
 }
 
+func (m JMap) GetStringArr(key string) ([]string, bool) {
+	if arr, ok := m.GetArr(key); ok {
+		var list []string
+		for _, v := range arr {
+			if s, ok := JString(v); ok {
+				list = append(list, s)
+			}
+		}
+		return list, true
+	}
+	return nil, false
+}
+
+func (m JMap) GetIntArr(key string) ([]int64, bool) {
+	if arr, ok := m.GetArr(key); ok {
+		var list []int64
+		for _, v := range arr {
+			if i, ok := JInt(v); ok {
+				list = append(list, i)
+			}
+		}
+		return list, true
+	}
+	return nil, false
+}
+
 // GetStruct 从JMap中直接获取某个struct，pointer需要传struct的指针的指针
 func (m JMap) GetStruct(key string, pointer interface{}) error {
 	if i, ok := m[key]; ok {

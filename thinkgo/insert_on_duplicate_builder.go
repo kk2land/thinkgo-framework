@@ -105,6 +105,7 @@ func (m *InsertOnDuplicateBuilder) AppendArgs(rowIdx int, args ...interface{}) {
 	m.argsIdx = j + m.cols
 }
 
+// TakeArgs 支持数量没有达到capacity，也可以正确获取数据
 func (m *InsertOnDuplicateBuilder) TakeArgs() (ret []interface{}) {
 	//第一个参数是sql
 	m.sql.WriteString(m.sql3)
