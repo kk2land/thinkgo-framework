@@ -2,6 +2,7 @@ package thinkgo
 
 import "C"
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -22,6 +23,10 @@ const (
 )
 
 type HttpWsConnWritePing func(conn *websocket.Conn) error
+
+func HttpWsJsonMarshal(msg interface{}) ([]byte, error) {
+	return json.Marshal(msg)
+}
 
 var httpWsConnIdCounter atomic.Uint64
 var httpWsConnGroupIdCounter atomic.Uint64
