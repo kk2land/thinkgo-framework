@@ -333,7 +333,7 @@ func (m *HttpWsConn[T]) Start() error {
 
 	m.logger.Infof("开始ReadMessage")
 	var b []byte
-	var msg interface{}
+	var msg T
 
 	for {
 		_, b, err = m.conn.ReadMessage()
