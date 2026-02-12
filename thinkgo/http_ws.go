@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -92,7 +93,9 @@ func newHttpWsConn[T any](logger FieldLogger, router *HttpWsRouter[T], c *gin.Co
 		onClose:        httpWsConnOnClose[T],
 		writePing:      httpWsConnWritePing,
 	}
-	wsConn.ctx["RemoteAddr"] = c.Request.RemoteAddr
+
+	_, clientPort, _ := net.SplitHostPort(c.Request.RemoteAddr)
+	wsConn.ctx["RemoteAddr"] = c.ClientIP() + ":" + clientPort
 	return wsConn
 }
 
