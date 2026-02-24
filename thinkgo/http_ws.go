@@ -23,6 +23,9 @@ const (
 	HttpWsConnCloseFromKeyReplace        // HttpWsConn因为相同key被顶掉导致退出
 )
 
+const httpWsConnPingInterval = 15 * time.Second
+const httpWsConnReadDeadline = httpWsConnPingInterval * 2
+
 type HttpWsConnWritePing func(conn *websocket.Conn) error
 
 func HttpWsJsonMarshal(msg interface{}) ([]byte, error) {
@@ -31,8 +34,6 @@ func HttpWsJsonMarshal(msg interface{}) ([]byte, error) {
 
 var httpWsConnIdCounter atomic.Uint64
 var httpWsConnGroupIdCounter atomic.Uint64
-var httpWsConnPingInterval = 15 * time.Second
-var httpWsConnReadDeadline = httpWsConnPingInterval * 2
 
 type httpWsConnCloseData struct {
 	from int
@@ -76,6 +77,8 @@ type HttpWsConn[T any] struct {
 	onClose         func(wsConn *HttpWsConn[T], from int, err error, writeNoNetErr func([]byte))
 	writePing       HttpWsConnWritePing
 	writePingCustom bool
+	pingInterval    time.Duration
+	readDeadline    time.Duration
 }
 
 func newHttpWsConn[T any](logger FieldLogger, router *HttpWsRouter[T], c *gin.Context, conn *websocket.Conn) *HttpWsConn[T] {
@@ -92,6 +95,8 @@ func newHttpWsConn[T any](logger FieldLogger, router *HttpWsRouter[T], c *gin.Co
 		onMessage:      httpWsConnOnMessage[T],
 		onClose:        httpWsConnOnClose[T],
 		writePing:      httpWsConnWritePing,
+		pingInterval:   httpWsConnPingInterval,
+		readDeadline:   httpWsConnReadDeadline,
 	}
 
 	_, clientPort, _ := net.SplitHostPort(c.Request.RemoteAddr)
@@ -112,17 +117,30 @@ func (m *HttpWsConn[T]) ConnId() uint64 {
 	return m.connId
 }
 
+// OnMessage 设置消息回调函数，必须在Start之前调用
 func (m *HttpWsConn[T]) OnMessage(f func(wsConn *HttpWsConn[T], msg T) error) {
 	m.onMessage = f
 }
 
+// OnClose 设置链接断开回调函数，必须在Start之前调用
 func (m *HttpWsConn[T]) OnClose(f func(wsConn *HttpWsConn[T], from int, err error, writeNoNetErr func([]byte))) {
 	m.onClose = f
 }
 
+// WritePing 设置自定义发送ping函数，必须在Start之前调用
 func (m *HttpWsConn[T]) WritePing(f HttpWsConnWritePing) {
 	m.writePing = f
 	m.writePingCustom = true
+}
+
+// SetPingInterval 设置发送ping的时间间隔，必须在Start之前调用
+func (m *HttpWsConn[T]) SetPingInterval(interval time.Duration) {
+	m.pingInterval = interval
+}
+
+// SetReadDeadline 设置读取消息超时时间，必须在Start之前调用
+func (m *HttpWsConn[T]) SetReadDeadline(deadline time.Duration) {
+	m.readDeadline = deadline
 }
 
 // CtxLoad 读取业务key/value
@@ -229,7 +247,7 @@ func (m *HttpWsConn[T]) String() string {
 }
 
 func (m *HttpWsConn[T]) goWrite() {
-	tick := time.NewTicker(httpWsConnPingInterval)
+	tick := time.NewTicker(m.pingInterval)
 	defer tick.Stop()
 
 	writeNoNetErr := func(b []byte) {
@@ -320,14 +338,14 @@ loop:
 func (m *HttpWsConn[T]) Start() error {
 	var err error
 	//设置读取超时时间
-	if err = m.conn.SetReadDeadline(time.Now().Add(httpWsConnReadDeadline)); err != nil {
+	if err = m.conn.SetReadDeadline(time.Now().Add(m.readDeadline)); err != nil {
 		m.logger.Errorf("SetReadDeadline fail - %s", err)
 		return err
 	}
 	//如果没有自定义writePing，则设置自动响应pong帧
 	if !m.writePingCustom {
 		m.conn.SetPongHandler(func(appData string) error {
-			return m.conn.SetReadDeadline(time.Now().Add(httpWsConnReadDeadline))
+			return m.conn.SetReadDeadline(time.Now().Add(m.readDeadline))
 		})
 	}
 
@@ -350,7 +368,7 @@ func (m *HttpWsConn[T]) Start() error {
 			return err
 		}
 		//收到消息就重置read deadline
-		_ = m.conn.SetReadDeadline(time.Now().Add(httpWsConnReadDeadline))
+		_ = m.conn.SetReadDeadline(time.Now().Add(m.readDeadline))
 		m.logger.Debugf("ReadMessage=%s", b)
 		if msg, err = m.router.Unmarshal(b); err != nil {
 			m.logger.Warnf("Unmarshal error-%v,%s", err, b)
