@@ -1,10 +1,5 @@
 package thinkgo
 
-///*
-//#include <unistd.h>
-//int isatty(int fd);
-//*/
-//import "C"
 import (
 	"github.com/erikdubbelboer/gspt"
 	"golang.org/x/term"
@@ -13,7 +8,9 @@ import (
 )
 
 // IsAtty 判断是否在终端运行
-var IsAtty = term.IsTerminal(int(os.Stdout.Fd())) //C.isatty(C.int(os.Stdout.Fd())) == 1
+func IsAtty() bool {
+	return term.IsTerminal(int(os.Stdout.Fd()))
+}
 
 // WriteFile 写文件
 func WriteFile(path string, b []byte) error {

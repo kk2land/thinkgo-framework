@@ -24,18 +24,18 @@ type appConfig struct {
 type HttpConfig struct {
 	Port           int
 	WithGrpc       bool
-	ReadTimeout    ConversionDuration
-	WriteTimeout   ConversionDuration
-	IdleTimeout    ConversionDuration
+	ReadTimeout    ConvDuration
+	WriteTimeout   ConvDuration
+	IdleTimeout    ConvDuration
 	MaxHeaderBytes int
 }
 
 type redisOptionConfig struct {
-	Timeout         ConversionDuration
+	Timeout         ConvDuration
 	PoolSize        int
 	MaxRetries      int
-	MinRetryBackoff ConversionDuration
-	MaxRetryBackoff ConversionDuration
+	MinRetryBackoff ConvDuration
+	MaxRetryBackoff ConvDuration
 }
 
 type redisConfig struct {
@@ -63,8 +63,8 @@ type dbConfig struct {
 	DriverName        string
 	DriverSourceName  string
 	DriverSourceNames []string
-	ConnMaxLifetime   ConversionDuration
-	ConnMaxIdleTime   ConversionDuration
+	ConnMaxLifetime   ConvDuration
+	ConnMaxIdleTime   ConvDuration
 	dbOptionConfig
 	CmdOptions map[string]dbOptionConfig `toml:"cmd_options"`
 }

@@ -7,10 +7,10 @@ import (
 	"strconv"
 )
 
-// ConversionInts 格式：[int1, int2, ...] or "int1,int2,int3"的序列化/反序列化，支持json/xorm
-type ConversionInts []int
+// ConvUInt32s 格式：[0, 1, ...] or "0,1,..."的序列化/反序列化，支持json/xorm
+type ConvUInt32s []uint32
 
-func (c *ConversionInts) UnmarshalJSON(b []byte) error {
+func (c *ConvUInt32s) UnmarshalJSON(b []byte) error {
 	if bytes.Equal(b, ConversionJsonNull) {
 		*c = nil
 		return nil
@@ -25,10 +25,13 @@ func (c *ConversionInts) UnmarshalJSON(b []byte) error {
 		if err := json.Unmarshal(b, &arr); err != nil {
 			return err
 		}
-		vals := make([]int, 0, len(arr))
+		vals := make([]uint32, 0, len(arr))
 		for i, v := range arr {
 			if v1, ok := JInt(v); ok {
-				vals = append(vals, int(v1))
+				if v1 < 0 {
+					return fmt.Errorf("第%d个是负数-%v,%s", i, v, string(b))
+				}
+				vals = append(vals, uint32(v1))
 			} else {
 				return fmt.Errorf("第%d个无法转int-%v,%s", i, v, string(b))
 			}
@@ -39,22 +42,22 @@ func (c *ConversionInts) UnmarshalJSON(b []byte) error {
 	return fmt.Errorf("json解析非字符串/数组-%s", string(b))
 }
 
-func (c ConversionInts) MarshalJSON() ([]byte, error) {
+func (c ConvUInt32s) MarshalJSON() ([]byte, error) {
 	buf := &bytes.Buffer{}
 	buf.WriteByte('"')
 	for i, v := range c {
 		if i > 0 {
 			buf.WriteByte(',')
 		}
-		buf.WriteString(strconv.Itoa(v))
+		buf.WriteString(strconv.FormatInt(int64(v), 10))
 	}
 	buf.WriteByte('"')
 	return buf.Bytes(), nil
 }
 
-func (c *ConversionInts) FromDB(b []byte) error {
+func (c *ConvUInt32s) FromDB(b []byte) error {
 	arr := bytes.Split(b, []byte{','})
-	vals := make([]int, 0, len(arr))
+	vals := make([]uint32, 0, len(arr))
 	for i, v := range arr {
 		if len(v) == 0 {
 			continue
@@ -62,20 +65,23 @@ func (c *ConversionInts) FromDB(b []byte) error {
 		if v1, err := strconv.Atoi(string(v)); err != nil {
 			return fmt.Errorf("第%d个无法转int-%s,%s", i, string(v), string(b))
 		} else {
-			vals = append(vals, v1)
+			if v1 < 0 {
+				return fmt.Errorf("第%d个是负数-%s,%s", i, string(v), string(b))
+			}
+			vals = append(vals, uint32(v1))
 		}
 	}
 	*c = vals
 	return nil
 }
 
-func (c ConversionInts) ToDB() ([]byte, error) {
+func (c ConvUInt32s) ToDB() ([]byte, error) {
 	buf := &bytes.Buffer{}
 	for i, v := range c {
 		if i > 0 {
 			buf.WriteByte(',')
 		}
-		buf.WriteString(strconv.Itoa(v))
+		buf.WriteString(strconv.FormatInt(int64(v), 10))
 	}
 	return buf.Bytes(), nil
 }

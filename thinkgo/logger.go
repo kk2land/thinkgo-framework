@@ -142,7 +142,7 @@ func NewLogger(name string) FieldLogger {
 		logger.SetLevel(logrus.InfoLevel)
 	}
 	logger.SetFormatter(&loggerLogrusFormat{})
-	if !IsAtty && os.Getenv(envKeyLogConsole) != "1" {
+	if !IsAtty() && os.Getenv(envKeyLogConsole) != "1" {
 		logger.SetNoLock()
 		logger.SetOutput(newLoggerDailyWriter(name))
 	} else {
