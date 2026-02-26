@@ -235,6 +235,7 @@ func (m *HttpWsConn[T]) RemoteAddr() string {
 	return remoteAddr.(string)
 }
 
+// SetName 给wsConn设置名称，方便日志定位，不同于key，name不会排他性
 func (m *HttpWsConn[T]) SetName(name string) {
 	m.CtxStore("Name", name)
 }
@@ -514,7 +515,7 @@ func (m *HttpWsRouter[T]) Unmarshal(b []byte) (T, error) {
 	return m.unmarshal(b)
 }
 
-// KeyConnBind 可以将wsConn绑定一个key
+// KeyConnBind 可以将wsConn绑定一个key，如果key相同，可以顶掉其他已经绑定的wsConn
 func (m *HttpWsRouter[T]) KeyConnBind(key string, wsConn *HttpWsConn[T], replace bool) (swapped bool) {
 	if key1 := wsConn.Key(); key1 != "" && key1 != key {
 		//不支持对wsConn绑定不同的key
