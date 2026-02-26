@@ -21,6 +21,7 @@ const (
 	HttpWsConnCloseFromPingErr           // HttpWsConn发送ping错误导致退出
 	HttpWsConnCloseFromNoPong            // HttpWsConn接收消息超时导致退出(包括pong消息)
 	HttpWsConnCloseFromKeyReplace        // HttpWsConn因为相同key被顶掉导致退出
+	HttpWsConnCloseFromClient            // HttpWsConn因为客户端关闭导致退出
 )
 
 const httpWsConnPingInterval = 15 * time.Second
@@ -234,6 +235,18 @@ func (m *HttpWsConn[T]) RemoteAddr() string {
 	return remoteAddr.(string)
 }
 
+func (m *HttpWsConn[T]) SetName(name string) {
+	m.CtxStore("Name", name)
+}
+
+func (m *HttpWsConn[T]) Name() string {
+	if tmp1, ok := m.CtxLoad("Name"); ok {
+		return tmp1.(string)
+	} else {
+		return ""
+	}
+}
+
 func (m *HttpWsConn[T]) Key() string {
 	if key, ok := m.CtxLoad("Key"); ok {
 		return key.(string)
@@ -255,15 +268,27 @@ func (m *HttpWsConn[T]) goWrite() {
 	}
 	var key string
 	var groups = make(map[uint64]*HttpWsConnGroup[T])
+	var suffix = func() string {
+		if name := m.Name(); name != "" {
+			return "key=" + key + ",name=" + name
+		} else {
+			return "key=" + key
+		}
+	}
+
 loop:
 	for {
 		select {
 		case data := <-m.closeChannel:
 			if data == nil {
-				m.logger.Infof("正常退出")
+				m.logger.Infof("正常退出,%s", suffix())
 				m.onClose(m, HttpWsConnCloseFromNormal, nil, writeNoNetErr)
 			} else {
-				m.logger.Warnf("异常退出-%d,%v", data.from, data.err)
+				if data.from == HttpWsConnCloseFromClient {
+					m.logger.Warnf("客户端退出-%s", suffix())
+				} else {
+					m.logger.Warnf("异常退出-%d,%v,%s", data.from, data.err, suffix())
+				}
 				switch data.from {
 				// 以下close类型，在关闭前可以发送数据到客户端
 				case HttpWsConnCloseFromMessageErr, HttpWsConnCloseFromKeyReplace:
@@ -290,20 +315,20 @@ loop:
 		case b := <-m.writeChannel:
 			m.logger.Debugf("WriteMessage=%s", b)
 			if err := m.conn.WriteMessage(websocket.TextMessage, b); err != nil {
-				m.logger.Errorf("write fail-%v,%s", err, b)
+				m.logger.Errorf("write fail-%v,%s,%s", err, b, suffix())
 				m.onClose(m, HttpWsConnCloseFromWriteErr, err, nil)
 				break loop
 			}
 
 		case <-tick.C:
 			if err := m.writePing(m.conn); err != nil {
-				m.logger.Errorf("ping fail-%v", err)
+				m.logger.Errorf("ping fail-%v,%s", err, suffix())
 				m.onClose(m, HttpWsConnCloseFromPingErr, err, nil)
 				break loop
 			}
 		}
 	}
-	m.logger.Infof("开始退出write协程,key=%s", key)
+	m.logger.Infof("开始退出write协程,%s", suffix())
 	//启动一个协程来消耗writeChannel/controlChannel
 	go func() {
 		for {
@@ -332,7 +357,7 @@ loop:
 	//将wsConn从router中移除
 	m.router.closeConn(key, m)
 	_ = m.conn.Close()
-	m.logger.Infof("结束退出write协程,key=%s", key)
+	m.logger.Infof("结束退出write协程,%s", suffix())
 }
 
 func (m *HttpWsConn[T]) Start() error {
@@ -359,6 +384,10 @@ func (m *HttpWsConn[T]) Start() error {
 	for {
 		_, b, err = m.conn.ReadMessage()
 		if err != nil {
+			if err1, ok1 := err.(*websocket.CloseError); ok1 {
+				m.close(HttpWsConnCloseFromClient, err)
+				return err1
+			}
 			m.logger.Errorf("ReadMessage fail,err=%s", err)
 			if ErrIsTimeout(err) {
 				m.close(HttpWsConnCloseFromNoPong, err)
