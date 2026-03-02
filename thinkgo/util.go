@@ -222,11 +222,11 @@ func SafeGo1(shouldPanic, skipChannelClosed bool, f func()) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
+				stack := Stack(3, 5)
 				if skipChannelClosed {
 					//跳过：send一个已经被关闭的channel的错误
 					if err, ok := r.(error); ok && err.Error() == "send on closed channel" {
 						Logger.Error(err.Error())
-						stack := Stack(3, 5)
 						Logger.Errorf("stack=%s", stack)
 						return
 					}
@@ -238,7 +238,6 @@ func SafeGo1(shouldPanic, skipChannelClosed bool, f func()) {
 					hint = "错误"
 				}
 				OpsAlarmWithGroup(Config.OpsAlarm, shouldPanic, "%s 协程panic%s-%v", AppName, hint, r)
-				stack := Stack(3, 5)
 				Logger.Errorf("stack=%s", stack)
 				if shouldPanic {
 					panic(r)
