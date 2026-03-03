@@ -222,6 +222,7 @@ func SafeGo1(shouldPanic, skipChannelClosed bool, f func()) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
+				fmt.Printf("%v\n", r)
 				stack := Stack(3, 5)
 				if skipChannelClosed {
 					//跳过：send一个已经被关闭的channel的错误
