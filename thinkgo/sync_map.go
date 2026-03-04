@@ -66,3 +66,9 @@ func (m *SyncMap[T]) Clear(f func(key string, val T)) {
 		return true
 	})
 }
+
+func (m *SyncMap[T]) Lock(f func(items *sync.Map)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	f(&m.items)
+}
