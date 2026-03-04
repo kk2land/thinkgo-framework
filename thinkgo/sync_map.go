@@ -59,14 +59,10 @@ func (m *SyncMap[T]) Clear(f func(key string, val T)) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var keys []string
 	m.items.Range(func(key, val any) bool {
 		key1 := key.(string)
 		f(key1, val.(T))
-		keys = append(keys, key1)
+		m.items.Delete(key)
 		return true
 	})
-	for _, key := range keys {
-		m.items.Delete(key)
-	}
 }
