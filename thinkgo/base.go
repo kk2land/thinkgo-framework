@@ -230,16 +230,22 @@ func WritePidFile() error {
 	return WriteFile(filepath.Join(RuntimePath, "pid", AppName+".pid"), []byte(strconv.Itoa(Pid)))
 }
 
+type shutdownHook struct {
+	id int32
+	f  func(wait *sync.WaitGroup)
+}
+
 var startHooks = struct {
 	hooks []func()
 	mu    sync.Mutex
 	done  bool
 }{}
 var shutdownHooks = struct {
-	hooks []func(wait *sync.WaitGroup)
+	hooks []shutdownHook
 	mu    sync.Mutex
 	done  bool
 }{}
+var shutdownHooksIdCounter atomic.Int32
 
 // AddStartHook 添加http-server等服务启动时的回调
 func AddStartHook(h func()) {
@@ -268,13 +274,29 @@ func CallStartHooks() {
 }
 
 // AddShutdownHook 添加服务停止时的回调
-func AddShutdownHook(h func(wait *sync.WaitGroup)) {
+func AddShutdownHook(h func(wait *sync.WaitGroup)) int32 {
 	shutdownHooks.mu.Lock()
 	defer shutdownHooks.mu.Unlock()
 	if shutdownHooks.done {
 		panic(errors.New("server已经停止，不能再AddShutdownHook"))
 	}
-	shutdownHooks.hooks = append(shutdownHooks.hooks, h)
+	id := shutdownHooksIdCounter.Add(1)
+	shutdownHooks.hooks = append(shutdownHooks.hooks, shutdownHook{id, h})
+	return id
+}
+
+// RemoveShutdownHook 移除服务停止回调
+func RemoveShutdownHook(id int32) {
+	shutdownHooks.mu.Lock()
+	defer shutdownHooks.mu.Unlock()
+	if !shutdownHooks.done {
+		for i, hook := range shutdownHooks.hooks {
+			if hook.id == id {
+				shutdownHooks.hooks = append(shutdownHooks.hooks[:i], shutdownHooks.hooks[i+1:]...)
+				break
+			}
+		}
+	}
 }
 
 // CallShutdownHooks 触发服务停止时的回调，以下使用情景自动有效
@@ -286,8 +308,8 @@ func CallShutdownHooks() {
 	shutdownHooks.mu.Lock()
 	defer shutdownHooks.mu.Unlock()
 	wait := sync.WaitGroup{}
-	for _, h := range shutdownHooks.hooks {
-		h(&wait)
+	for _, hook := range shutdownHooks.hooks {
+		hook.f(&wait)
 	}
 	wait.Wait()
 	shutdownHooks.done = true
