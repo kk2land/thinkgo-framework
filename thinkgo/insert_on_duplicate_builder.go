@@ -31,7 +31,7 @@ func NewInsertOnDuplicateBuilder1(
 	table string,
 	cols []string,
 	keyNum int, //前几列是key
-	colExps map[string]string, //upsert的额外表达式，"col"=excluded."col"
+	colExps map[string]string, //upsert的额外表达式，"col"=excluded."col"，如果是""空字符串，那就跳过该字段的update
 ) *InsertOnDuplicateBuilder {
 	//第一部分
 	var colsStr string
@@ -68,7 +68,9 @@ func NewInsertOnDuplicateBuilder1(
 				tmp1 = append(tmp1, "\""+col+"\"")
 			} else {
 				if exp, ok := colExps[col]; ok {
-					tmp2 = append(tmp2, exp)
+					if exp != "" {
+						tmp2 = append(tmp2, exp)
+					}
 				} else {
 					tmp2 = append(tmp2, fmt.Sprintf("\"%s\"=excluded.\"%s\"", col, col))
 				}
@@ -83,7 +85,9 @@ func NewInsertOnDuplicateBuilder1(
 				continue
 			}
 			if exp, ok := colExps[col]; ok {
-				tmp = append(tmp, exp)
+				if exp != "" {
+					tmp = append(tmp, exp)
+				}
 			} else {
 				tmp = append(tmp, "`"+col+"`=values(`"+col+"`)")
 			}
