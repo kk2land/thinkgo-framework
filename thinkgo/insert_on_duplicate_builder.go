@@ -30,7 +30,7 @@ func NewInsertOnDuplicateBuilder1(
 	driver string,
 	table string,
 	cols []string,
-	keyNum int,                //前几列是key
+	keyNum int, //前几列是key
 	colExps map[string]string, //upsert的额外表达式，"col"=excluded."col"
 ) *InsertOnDuplicateBuilder {
 	//第一部分
@@ -68,7 +68,7 @@ func NewInsertOnDuplicateBuilder1(
 				tmp1 = append(tmp1, "\""+col+"\"")
 			} else {
 				if exp, ok := colExps[col]; ok {
-					tmp2 = append(tmp1, exp)
+					tmp2 = append(tmp2, exp)
 				} else {
 					tmp2 = append(tmp2, fmt.Sprintf("\"%s\"=excluded.\"%s\"", col, col))
 				}
