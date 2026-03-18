@@ -19,9 +19,19 @@ type InsertOnDuplicateBuilder struct {
 
 func NewInsertOnDuplicateBuilder(
 	driver string,
-	tableName string,
+	table string,
 	cols []string,
 	keyNum int, //前几列是key
+) *InsertOnDuplicateBuilder {
+	return NewInsertOnDuplicateBuilder1(driver, table, cols, keyNum, nil)
+}
+
+func NewInsertOnDuplicateBuilder1(
+	driver string,
+	table string,
+	cols []string,
+	keyNum int,                //前几列是key
+	colExps map[string]string, //upsert的额外表达式，"col"=excluded."col"
 ) *InsertOnDuplicateBuilder {
 	//第一部分
 	var colsStr string
@@ -31,7 +41,7 @@ func NewInsertOnDuplicateBuilder(
 	default:
 		colsStr = "`" + strings.Join(cols, "`,`") + "`"
 	}
-	sql1 := "insert into " + tableName + "(" + colsStr + ") values"
+	sql1 := "insert into " + table + "(" + colsStr + ") values"
 	//第二部分
 	var sql2 string
 	{
@@ -57,7 +67,11 @@ func NewInsertOnDuplicateBuilder(
 			if i < keyNum {
 				tmp1 = append(tmp1, "\""+col+"\"")
 			} else {
-				tmp2 = append(tmp2, fmt.Sprintf("\"%s\"=excluded.\"%s\"", col, col))
+				if exp, ok := colExps[col]; ok {
+					tmp2 = append(tmp1, exp)
+				} else {
+					tmp2 = append(tmp2, fmt.Sprintf("\"%s\"=excluded.\"%s\"", col, col))
+				}
 			}
 		}
 		sql3 = " on conflict(" + strings.Join(tmp1, ",") + ") do update set " + strings.Join(tmp2, ",")
@@ -68,7 +82,11 @@ func NewInsertOnDuplicateBuilder(
 			if i < keyNum {
 				continue
 			}
-			tmp = append(tmp, "`"+col+"`=values(`"+col+"`)")
+			if exp, ok := colExps[col]; ok {
+				tmp = append(tmp, exp)
+			} else {
+				tmp = append(tmp, "`"+col+"`=values(`"+col+"`)")
+			}
 		}
 		sql3 = " on duplicate key update " + strings.Join(tmp, ",")
 	}
