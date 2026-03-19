@@ -43,26 +43,27 @@ type gatewayRegisterEventBroadcastAddresses struct {
 }
 
 const (
-	gatewayProtocolCmdSendToOne   = 5
-	gatewayProtocolCmdSendToAll   = 6
-	gatewayProtocolCmdSendToUID   = 14
-	gatewayProtocolCmdSendToGroup = 22
+	GatewayProtocolCmdSendToOne      = 5  //发送消息单个链接
+	GatewayProtocolCmdSendToAll      = 6  //发送消息全部链接
+	GatewayProtocolCmdSendToUID      = 14 //发送消息给绑定了指定uid的链接
+	GatewayProtocolCmdSendToGroup    = 22 //发送消息给多个组
+	GatewayProtocolCmdGetGroupIDList = 26 //查询gateway的组id列表
 )
 
-type gatewayProtocol struct {
+type GatewayProtocol struct {
 	Cmd          uint8
-	LocalIP      net.IP
-	LocalPort    uint16
-	ClientIP     net.IP
-	ClientPort   uint16
-	ConnectionId uint32
-	Flag         uint8
-	GatewayPort  uint16
-	ExtData      interface{}
-	Body         []byte
+	LocalIP      net.IP      //可选
+	LocalPort    uint16      //可选
+	ClientIP     net.IP      //可选
+	ClientPort   uint16      //可选
+	ConnectionId uint32      //可选
+	Flag         uint8       //可选
+	GatewayPort  uint16      //可选
+	ExtData      interface{} //不同协议不一样
+	Body         []byte      //不同协议不一样
 }
 
-func (m *gatewayProtocol) encode() []byte {
+func (m *GatewayProtocol) Encode() []byte {
 	var extData []byte
 	if m.ExtData != nil {
 		extData, _ = json.Marshal(m.ExtData)
@@ -95,14 +96,16 @@ func (m *gatewayProtocol) encode() []byte {
 
 // GatewayClient 连接php的WorkerMan的gateway，向其发送消息
 type GatewayClient struct {
-	concurrency         int
-	registerAddress     string
-	timeout             time.Duration
-	gatewayAddressesRef atomic.Pointer[gatewayRegisterEventBroadcastAddresses]
-	lock                sync.RWMutex
-	closed              atomic.Bool
-	done                chan Void
-	gatewayChannel      chan *gatewayProtocol
+	concurrency          int
+	registerAddress      string
+	timeout              time.Duration
+	gatewayAddressesRef  atomic.Pointer[gatewayRegisterEventBroadcastAddresses]
+	lock                 sync.RWMutex
+	closed               atomic.Bool
+	done                 chan Void
+	gatewayChannel       chan *GatewayProtocol
+	FetchGatewayInterval time.Duration //定时查询gateway，必须在Start之前设置
+	FetchGateway         func(conns map[string]net.Conn)
 }
 
 func NewGatewayClient(concurrency int, registerAddress string) *GatewayClient {
@@ -111,7 +114,7 @@ func NewGatewayClient(concurrency int, registerAddress string) *GatewayClient {
 		registerAddress: registerAddress,
 		timeout:         5 * time.Second,
 		done:            make(chan Void),
-		gatewayChannel:  make(chan *gatewayProtocol, 20),
+		gatewayChannel:  make(chan *GatewayProtocol, 20),
 	}
 }
 
@@ -182,8 +185,8 @@ loop:
 	}
 }
 
-func (m *GatewayClient) goGateway() {
-	conns := make(map[string]net.Conn)
+func (m *GatewayClient) goGateway(i int) {
+	conns := make(map[string]net.Conn) // string(address) => net.Conn
 	failCounts := make(map[string]int)
 	timeout := 5 * time.Second
 
@@ -196,73 +199,99 @@ func (m *GatewayClient) goGateway() {
 		}
 	}
 
-loop:
-	for {
-		select {
-		case <-m.done:
-			break loop
-
-		case d := <-m.gatewayChannel:
-			addresses := m.gatewayAddressesRef.Load()
-			if addresses == nil {
-				if conns != nil {
-					for _, conn := range conns {
-						_ = conn.Close()
-					}
-					conns = make(map[string]net.Conn)
+	updateConns := func() {
+		addresses := m.gatewayAddressesRef.Load()
+		if addresses == nil {
+			if conns != nil {
+				for _, conn := range conns {
+					_ = conn.Close()
 				}
-				continue
-			} else {
-				deletes := make(map[string]bool)
-				for k, _ := range conns {
-					deletes[k] = true
-				}
-				for _, v := range addresses.Addresses {
-					if _, ok := conns[v]; !ok {
-						if conn, err := net.DialTimeout("tcp", v, timeout); err != nil {
-							addFailCount(v, err)
-						} else {
-							conns[v] = conn
-							delete(failCounts, v)
-						}
+				conns = make(map[string]net.Conn)
+			}
+		} else {
+			deletes := make(map[string]bool)
+			for k, _ := range conns {
+				deletes[k] = true
+			}
+			for _, v := range addresses.Addresses {
+				if _, ok := conns[v]; !ok {
+					if conn, err := net.DialTimeout("tcp", v, timeout); err != nil {
+						addFailCount(v, err)
 					} else {
-						delete(deletes, v)
+						conns[v] = conn
+						delete(failCounts, v)
 					}
+				} else {
+					delete(deletes, v)
 				}
-				for k, _ := range deletes {
-					conn := conns[k]
+			}
+			for k, _ := range deletes {
+				conn := conns[k]
+				_ = conn.Close()
+				delete(conns, k)
+			}
+		}
+	}
+
+	send := func(d *GatewayProtocol) {
+		updateConns()
+		if len(conns) == 0 {
+			return
+		}
+		b := d.Encode()
+		if len(d.LocalIP) > 0 {
+			k := d.LocalIP.String()
+			Logger.Debugf("GatewayClient::goGateway,send-%s", k)
+			if conn, ok := conns[k]; ok {
+				if _, err := conn.Write(b); err != nil {
+					addFailCount(k, err)
 					_ = conn.Close()
 					delete(conns, k)
 				}
-			}
-
-			b := d.encode()
-			if len(d.LocalIP) > 0 {
-				k := d.LocalIP.String()
-				Logger.Debugf("GatewayClient::goGateway,send-%s", k)
-				if conn, ok := conns[k]; ok {
-					if _, err := conn.Write(b); err != nil {
-						addFailCount(k, err)
-						_ = conn.Close()
-						delete(conns, k)
-					}
-				} else {
-					Logger.Warnf("GatewayClient::goGateway,找不到gateway节点-%s", k)
-				}
 			} else {
-				var deletes []string
-				for k, conn := range conns {
-					Logger.Debugf("GatewayClient::goGateway,send-%s", k)
-					_ = conn.SetWriteDeadline(time.Now().Add(m.timeout))
-					if _, err := conn.Write(b); err != nil {
-						addFailCount(k, err)
-						deletes = append(deletes, k)
-					}
+				Logger.Warnf("GatewayClient::goGateway,找不到gateway节点-%s", k)
+			}
+		} else {
+			var deletes []string
+			for k, conn := range conns {
+				Logger.Debugf("GatewayClient::goGateway,send-%s", k)
+				_ = conn.SetWriteDeadline(time.Now().Add(m.timeout))
+				if _, err := conn.Write(b); err != nil {
+					addFailCount(k, err)
+					deletes = append(deletes, k)
 				}
-				for _, k := range deletes {
-					_ = conns[k].Close()
-					delete(conns, k)
+			}
+			for _, k := range deletes {
+				_ = conns[k].Close()
+				delete(conns, k)
+			}
+		}
+	}
+
+	//开启了定时查询gateway功能
+	if i == 0 && m.FetchGatewayInterval > 0 {
+		tick := time.NewTicker(m.FetchGatewayInterval)
+		defer tick.Stop()
+
+		for {
+			select {
+			case <-m.done:
+				return
+
+			case <-tick.C:
+				updateConns()
+				if len(conns) > 0 {
+					m.FetchGateway(conns)
 				}
+			}
+		}
+	} else {
+		for {
+			select {
+			case <-m.done:
+				return
+			case d := <-m.gatewayChannel:
+				send(d)
 			}
 		}
 	}
@@ -275,9 +304,13 @@ func (m *GatewayClient) goStart() {
 	SafeGo(true, func() {
 		m.goRegister()
 	})
-	for i := 0; i < m.concurrency; i++ {
+	concurrency := m.concurrency
+	if m.FetchGatewayInterval > 0 {
+		concurrency++
+	}
+	for i := 0; i < concurrency; i++ {
 		SafeGo(true, func() {
-			m.goGateway()
+			m.goGateway(i)
 		})
 	}
 }
@@ -302,8 +335,8 @@ func (m *GatewayClient) SendToGroup(message []byte, group ...string) {
 		if closed {
 			return
 		}
-		m.gatewayChannel <- &gatewayProtocol{
-			Cmd:  gatewayProtocolCmdSendToGroup,
+		m.gatewayChannel <- &GatewayProtocol{
+			Cmd:  GatewayProtocolCmdSendToGroup,
 			Body: message,
 			ExtData: map[string]interface{}{
 				"group":   group,
@@ -318,8 +351,8 @@ func (m *GatewayClient) SendToUid(message []byte, uid ...string) {
 		if closed {
 			return
 		}
-		m.gatewayChannel <- &gatewayProtocol{
-			Cmd:     gatewayProtocolCmdSendToUID,
+		m.gatewayChannel <- &GatewayProtocol{
+			Cmd:     GatewayProtocolCmdSendToUID,
 			Body:    message,
 			ExtData: uid,
 		}
