@@ -52,7 +52,7 @@ const (
 
 type GatewayProtocol struct {
 	Cmd          uint8
-	LocalIP      net.IP      //可选
+	LocalIP      net.IP      //可选，指定发送哪个gateway
 	LocalPort    uint16      //可选
 	ClientIP     net.IP      //可选
 	ClientPort   uint16      //可选
@@ -328,6 +328,15 @@ func (m *GatewayClient) Close() {
 		defer m.lock.Unlock()
 		close(m.done)
 	}
+}
+
+func (m *GatewayClient) Send(msg *GatewayProtocol) {
+	m.withRLock(func(closed bool) {
+		if closed {
+			return
+		}
+		m.gatewayChannel <- msg
+	})
 }
 
 func (m *GatewayClient) SendToGroup(message []byte, group ...string) {
