@@ -273,6 +273,10 @@ func (m *GatewayClient) goGateway(i int) {
 		tick := time.NewTicker(m.FetchGatewayInterval)
 		defer tick.Stop()
 
+		updateConns()
+		if len(conns) > 0 {
+			m.FetchGateway(conns)
+		}
 		for {
 			select {
 			case <-m.done:
