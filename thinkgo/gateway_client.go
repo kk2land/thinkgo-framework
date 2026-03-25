@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -40,7 +41,7 @@ var gatewayRegisterEventWorkerConnect = []byte("{\"event\":\"worker_connect\",\"
 
 type gatewayRegisterEventBroadcastAddresses struct {
 	Event     string   `json:"event"`
-	Addresses []string `json:"addresses"`
+	Addresses []string `json:"addresses"` // ip:port
 }
 
 const (
@@ -53,8 +54,8 @@ const (
 
 type GatewayProtocol struct {
 	Cmd          uint8
-	LocalIP      net.IP      //可选，指定发送哪个gateway
-	LocalPort    uint16      //可选
+	LocalIP      net.IP      //可选，指定发送哪个gateway ip
+	LocalPort    uint16      //可选，指定发送哪个gateway port
 	ClientIP     net.IP      //可选
 	ClientPort   uint16      //可选
 	ConnectionId uint32      //可选
@@ -259,7 +260,7 @@ func (m *GatewayClient) goGateway(i int) {
 		}
 		b := d.Encode()
 		if len(d.LocalIP) > 0 {
-			k := d.LocalIP.String()
+			k := fmt.Sprintf("%s:%d", d.LocalIP.String(), d.LocalPort)
 			Logger.Debugf("GatewayClient::goGateway,send-%s", k)
 			if conn, ok := conns[k]; ok {
 				if err := m.Write(conn, b); err != nil {
