@@ -243,6 +243,7 @@ func (m *GatewayClient) goGateway(i int) {
 			k := d.LocalIP.String()
 			Logger.Debugf("GatewayClient::goGateway,send-%s", k)
 			if conn, ok := conns[k]; ok {
+				_ = conn.SetWriteDeadline(time.Now().Add(m.timeout))
 				if _, err := conn.Write(b); err != nil {
 					addFailCount(k, err)
 					_ = conn.Close()
