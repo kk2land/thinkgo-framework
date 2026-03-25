@@ -98,7 +98,7 @@ func (m *GatewayProtocol) Encode() []byte {
 type GatewayClient struct {
 	concurrency          int
 	registerAddress      string
-	timeout              time.Duration
+	Timeout              time.Duration
 	gatewayAddressesRef  atomic.Pointer[gatewayRegisterEventBroadcastAddresses]
 	lock                 sync.RWMutex
 	closed               atomic.Bool
@@ -112,7 +112,7 @@ func NewGatewayClient(concurrency int, registerAddress string) *GatewayClient {
 	return &GatewayClient{
 		concurrency:     concurrency,
 		registerAddress: registerAddress,
-		timeout:         5 * time.Second,
+		Timeout:         5 * time.Second,
 		done:            make(chan Void),
 		gatewayChannel:  make(chan *GatewayProtocol, 20),
 	}
@@ -132,7 +132,7 @@ func (m *GatewayClient) withRLock(f func(closed bool)) bool {
 }
 
 func (m *GatewayClient) getAllGatewayAddressesFromRegister() error {
-	conn, err := net.DialTimeout("tcp", m.registerAddress, m.timeout)
+	conn, err := net.DialTimeout("tcp", m.registerAddress, m.Timeout)
 	if err != nil {
 		return err
 	}
@@ -243,7 +243,7 @@ func (m *GatewayClient) goGateway(i int) {
 			k := d.LocalIP.String()
 			Logger.Debugf("GatewayClient::goGateway,send-%s", k)
 			if conn, ok := conns[k]; ok {
-				_ = conn.SetWriteDeadline(time.Now().Add(m.timeout))
+				_ = conn.SetWriteDeadline(time.Now().Add(m.Timeout))
 				if _, err := conn.Write(b); err != nil {
 					addFailCount(k, err)
 					_ = conn.Close()
@@ -256,7 +256,7 @@ func (m *GatewayClient) goGateway(i int) {
 			var deletes []string
 			for k, conn := range conns {
 				Logger.Debugf("GatewayClient::goGateway,send-%s", k)
-				_ = conn.SetWriteDeadline(time.Now().Add(m.timeout))
+				_ = conn.SetWriteDeadline(time.Now().Add(m.Timeout))
 				if _, err := conn.Write(b); err != nil {
 					addFailCount(k, err)
 					deletes = append(deletes, k)
