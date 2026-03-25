@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -98,7 +99,7 @@ func (m *GatewayProtocol) Encode() []byte {
 type GatewayClient struct {
 	concurrency          int
 	registerAddress      string
-	Timeout              time.Duration
+	timeout              time.Duration
 	gatewayAddressesRef  atomic.Pointer[gatewayRegisterEventBroadcastAddresses]
 	lock                 sync.RWMutex
 	closed               atomic.Bool
@@ -112,10 +113,28 @@ func NewGatewayClient(concurrency int, registerAddress string) *GatewayClient {
 	return &GatewayClient{
 		concurrency:     concurrency,
 		registerAddress: registerAddress,
-		Timeout:         5 * time.Second,
+		timeout:         5 * time.Second,
 		done:            make(chan Void),
 		gatewayChannel:  make(chan *GatewayProtocol, 20),
 	}
+}
+
+func (m *GatewayClient) Write(conn net.Conn, b []byte) error {
+	_ = conn.SetWriteDeadline(time.Now().Add(m.timeout))
+	if _, err := conn.Write(b); err != nil {
+		_ = conn.Close()
+		return err
+	}
+	return nil
+}
+
+func (m *GatewayClient) Read(conn net.Conn, size int) ([]byte, error) {
+	_ = conn.SetReadDeadline(time.Now().Add(m.timeout))
+	buf := make([]byte, size)
+	if _, err := io.ReadFull(conn, buf); err != nil {
+		return nil, err
+	}
+	return buf, nil
 }
 
 func (m *GatewayClient) withRLock(f func(closed bool)) bool {
@@ -132,7 +151,7 @@ func (m *GatewayClient) withRLock(f func(closed bool)) bool {
 }
 
 func (m *GatewayClient) getAllGatewayAddressesFromRegister() error {
-	conn, err := net.DialTimeout("tcp", m.registerAddress, m.Timeout)
+	conn, err := net.DialTimeout("tcp", m.registerAddress, m.timeout)
 	if err != nil {
 		return err
 	}
@@ -243,28 +262,19 @@ func (m *GatewayClient) goGateway(i int) {
 			k := d.LocalIP.String()
 			Logger.Debugf("GatewayClient::goGateway,send-%s", k)
 			if conn, ok := conns[k]; ok {
-				_ = conn.SetWriteDeadline(time.Now().Add(m.Timeout))
-				if _, err := conn.Write(b); err != nil {
+				if err := m.Write(conn, b); err != nil {
 					addFailCount(k, err)
-					_ = conn.Close()
 					delete(conns, k)
 				}
 			} else {
 				Logger.Warnf("GatewayClient::goGateway,找不到gateway节点-%s", k)
 			}
 		} else {
-			var deletes []string
 			for k, conn := range conns {
 				Logger.Debugf("GatewayClient::goGateway,send-%s", k)
-				_ = conn.SetWriteDeadline(time.Now().Add(m.Timeout))
-				if _, err := conn.Write(b); err != nil {
-					addFailCount(k, err)
-					deletes = append(deletes, k)
+				if err := m.Write(conn, b); err != nil {
+					delete(conns, k)
 				}
-			}
-			for _, k := range deletes {
-				_ = conns[k].Close()
-				delete(conns, k)
 			}
 		}
 	}
