@@ -8,6 +8,7 @@ type InsertBuilderInterface interface {
 	InitArgs(capacity int)
 	AppendArgs(rowIdx int, args ...interface{})
 	TakeArgs() (ret []interface{})
+	GetTable() string
 }
 
 // InsertBuilder 构建mysql的insert ignore的批量操作
@@ -119,4 +120,8 @@ func (m *InsertBuilder) TakeArgs() (ret []interface{}) {
 	}
 	m.args = nil
 	return ret
+}
+
+func (m *InsertBuilder) GetTable() string {
+	return m.Table
 }

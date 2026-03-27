@@ -42,7 +42,7 @@ func NewInsertOnDuplicateBuilder1(
 	default:
 		colsStr = "`" + strings.Join(cols, "`,`") + "`"
 	}
-	
+
 	sql1 := "insert into " + table + "(" + colsStr + ") values"
 	//第二部分
 	var sql2 string
@@ -144,4 +144,8 @@ func (m *InsertOnDuplicateBuilder) TakeArgs() (ret []interface{}) {
 	}
 	m.args = nil
 	return ret
+}
+
+func (m *InsertOnDuplicateBuilder) GetTable() string {
+	return m.Table
 }
