@@ -20,12 +20,13 @@ type InsertBuilder struct {
 	sql      *strings.Builder
 	args     []interface{}
 	argsIdx  int
+	Table    string
 }
 
 func NewInsertBuilder(
 	mode int, //0=普通insert; 1=insert ignore; 2=replace(mysql);
 	driver string,
-	tableName string,
+	table string,
 	cols []string,
 ) *InsertBuilder {
 	//第一部分
@@ -50,7 +51,7 @@ func NewInsertBuilder(
 	default:
 		colsStr = "`" + strings.Join(cols, "`,`") + "`"
 	}
-	sql1 := op + " into " + tableName + "(" + colsStr + ") values"
+	sql1 := op + " into " + table + "(" + colsStr + ") values"
 	//第二部分
 	var sql2 string
 	{
@@ -72,10 +73,11 @@ func NewInsertBuilder(
 		sql3 = " on conflict do nothing"
 	}
 	return &InsertBuilder{
-		cols: len(cols),
-		sql1: sql1,
-		sql2: sql2,
-		sql3: sql3,
+		cols:  len(cols),
+		sql1:  sql1,
+		sql2:  sql2,
+		sql3:  sql3,
+		Table: table,
 	}
 }
 

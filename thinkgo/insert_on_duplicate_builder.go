@@ -15,6 +15,7 @@ type InsertOnDuplicateBuilder struct {
 	sql      *strings.Builder
 	args     []interface{}
 	argsIdx  int
+	Table    string
 }
 
 func NewInsertOnDuplicateBuilder(
@@ -30,7 +31,7 @@ func NewInsertOnDuplicateBuilder1(
 	driver string,
 	table string,
 	cols []string,
-	keyNum int, //前几列是key
+	keyNum int,                //前几列是key
 	colExps map[string]string, //upsert的额外表达式，"col"=excluded."col"，如果是""空字符串，那就跳过该字段的update
 ) *InsertOnDuplicateBuilder {
 	//第一部分
@@ -95,10 +96,11 @@ func NewInsertOnDuplicateBuilder1(
 		sql3 = " on duplicate key update " + strings.Join(tmp, ",")
 	}
 	return &InsertOnDuplicateBuilder{
-		cols: len(cols),
-		sql1: sql1,
-		sql2: sql2,
-		sql3: sql3,
+		cols:  len(cols),
+		sql1:  sql1,
+		sql2:  sql2,
+		sql3:  sql3,
+		Table: table,
 	}
 }
 
