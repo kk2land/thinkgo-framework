@@ -261,7 +261,7 @@ func (m *GatewayClient) goGateway(i int) {
 		b := d.Encode()
 		if len(d.LocalIP) > 0 {
 			k := fmt.Sprintf("%s:%d", d.LocalIP.String(), d.LocalPort)
-			Logger.Debugf("GatewayClient::goGateway,send-%s", k)
+			Logger.Debugf("GatewayClient::goGateway,localSend-%s", k)
 			if conn, ok := conns[k]; ok {
 				if err := m.Write(conn, b); err != nil {
 					addFailCount(k, err)

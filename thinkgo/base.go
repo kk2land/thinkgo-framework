@@ -3,8 +3,6 @@ package thinkgo
 import (
 	"errors"
 	"fmt"
-	"github.com/fvbock/endless"
-	"github.com/joho/godotenv"
 	"log/syslog"
 	"net"
 	"net/http"
@@ -16,6 +14,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+
+	"github.com/fvbock/endless"
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -24,10 +25,7 @@ const (
 	envKeyAppDebug         = "_TK_AppDebug"          // '1'则开启debug模式
 	envKeyInternalHttpPort = "_TK_Internal_HttpPort" // http服务内部使用，对于随机的端口，reload后保持端口不变
 	envKeyLogConsole       = "_TK_LogConsole"        // '1'则直接将日志输出到屏幕上
-
-	CommandNameHttp      = "http"       //二进制命令名-http
-	CommandNameGrpc      = "grpc"       //二进制命令-grpc
-	CommandNameHttpCheck = "http_check" //二进制命令-httpCheck: 检查配置/环境变量是否有问题
+	envKeyCommand          = "_TK_Command"           // 可以指定新的CommandName
 )
 
 var (
@@ -77,7 +75,9 @@ func init() {
 	}
 
 	//初始化各种变量
-	CommandName = filepath.Base(os.Args[0])
+	if CommandName = os.Getenv(envKeyCommand); CommandName == "" {
+		CommandName = filepath.Base(os.Args[0])
+	}
 
 	envFile := filepath.Join(RootPath, ".env")
 	if IsFile(envFile) {
