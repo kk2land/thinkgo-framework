@@ -47,6 +47,8 @@ var (
 	Logger FieldLogger //当前应用的logger对象
 
 	opsAlarmQueueRef atomic.Pointer[opsAlarmQueue]
+
+	commands = make(map[string]func())
 )
 
 func init() {
@@ -177,6 +179,23 @@ func initPathVars(dir string) error {
 		return fmt.Errorf("runtime path not dir - %s", RuntimePath)
 	}
 	return nil
+}
+
+// CommandRegister 命令入口注册
+func CommandRegister(name string, f func()) interface{} {
+	commands[name] = f
+	return nil
+}
+
+// CommandRun 命令执行
+func CommandRun() {
+	cmd := os.Args[1]
+	if f, ok := commands[cmd]; !ok {
+		panic(fmt.Errorf("command(%s)不存在-%s", cmd))
+	} else {
+		os.Args = os.Args[1:]
+		f()
+	}
 }
 
 // OpsAlarm 进行tg告警，要依赖运维部署环境
