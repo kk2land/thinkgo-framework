@@ -194,6 +194,7 @@ func CommandRun() {
 		panic(fmt.Errorf("command(%s)不存在-%s", cmd))
 	} else {
 		os.Args = os.Args[1:]
+		SetProcessTitle(AppPath + "/bin/" + cmd)
 		f()
 	}
 }
