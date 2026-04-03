@@ -149,6 +149,7 @@ end
 			l.state.Store(ret == 1)
 			select {
 			case l.stateCh <- VoidValue:
+			default:
 			}
 		}
 	}
@@ -166,6 +167,7 @@ end
 				l.state.Store(false)
 				select {
 				case l.stateCh <- VoidValue:
+				default:
 				}
 			} else {
 				call()

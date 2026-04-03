@@ -4,13 +4,14 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 )
 
 const (
@@ -220,6 +221,7 @@ func (m *HttpWsConn[T]) WriteBytes(b []byte) {
 func (m *HttpWsConn[T]) TryWriteBytes(b []byte) {
 	select {
 	case m.writeChannel <- b:
+	default:
 	}
 }
 
@@ -416,6 +418,7 @@ func (m *HttpWsConn[T]) Start() error {
 func (m *HttpWsConn[T]) close(from int, err error) {
 	select {
 	case m.closeChannel <- &httpWsConnCloseData{from, err}:
+	default:
 	}
 }
 
