@@ -167,7 +167,7 @@ func (l *KeyLockRedis) LockTimeout(key string, timeout time.Duration, f KeyLockH
 	p := r.Raw().Pipeline()
 	res1 := p.TTL(ctx, key)
 	res2 := p.Get(ctx, key)
-	if _, err := p.Exec(context.Background()); err != nil {
+	if _, err := p.Exec(context.Background()); !RedisErrNilOrKeyNotExist(err) {
 		panic(err)
 	} else {
 		panic(&keyLockError{
