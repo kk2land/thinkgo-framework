@@ -2,6 +2,7 @@ package thinkgo
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"log/syslog"
 	"net"
@@ -194,6 +195,7 @@ func CommandRun() {
 		panic(fmt.Errorf("command(%s)不存在-%s", cmd))
 	} else {
 		os.Args = os.Args[1:]
+		flag.CommandLine.Init(cmd, flag.PanicOnError)
 		SetProcessTitle(AppPath + "/bin/" + cmd)
 		f()
 	}
