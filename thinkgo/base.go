@@ -27,6 +27,7 @@ const (
 	envKeyInternalHttpPort = "_TK_Internal_HttpPort" // http服务内部使用，对于随机的端口，reload后保持端口不变
 	envKeyLogConsole       = "_TK_LogConsole"        // '1'则直接将日志输出到屏幕上
 	envKeyCommand          = "_TK_Command"           // 可以指定新的CommandName
+	envKeySystemEnvFile    = "_TK_SYSTEM_ENV"        // 可以指定额外系统级的env文件（先于.env加载）
 )
 
 var (
@@ -82,10 +83,14 @@ func init() {
 		CommandName = filepath.Base(os.Args[0])
 	}
 
+	if systemEnvFile := os.Getenv(envKeySystemEnvFile); systemEnvFile != "" && IsFile(systemEnvFile) {
+		if err = godotenv.Load(envKeySystemEnvFile); err != nil {
+			panic(err)
+		}
+	}
 	envFile := filepath.Join(RootPath, ".env")
 	if IsFile(envFile) {
-		err = godotenv.Load(envFile)
-		if err != nil {
+		if err = godotenv.Load(envFile); err != nil {
 			panic(err)
 		}
 	}
