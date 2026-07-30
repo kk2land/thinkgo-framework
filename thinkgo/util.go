@@ -2,6 +2,7 @@ package thinkgo
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -125,11 +126,13 @@ type timeoutError interface {
 
 // ErrIsTimeout 判断err是timeout
 func ErrIsTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
 	if e, ok := err.(timeoutError); ok {
 		return e.Timeout()
-	} else {
-		return false
 	}
+	return false
 }
 
 // ErrIsBrokenPipe 判断err是连接中断
