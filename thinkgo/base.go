@@ -187,6 +187,8 @@ func initPathVars(dir string) error {
 	return nil
 }
 
+var commandMain string
+
 // CommandRegister 命令入口注册
 func CommandRegister(name string, f func()) interface{} {
 	commands[name] = f
@@ -195,6 +197,7 @@ func CommandRegister(name string, f func()) interface{} {
 
 // CommandRun 命令执行
 func CommandRun() {
+	commandMain = os.Args[0]
 	cmd := os.Args[1]
 	if f, ok := commands[cmd]; !ok {
 		panic(fmt.Errorf("command(%s)不存在-%s", cmd))
@@ -379,6 +382,19 @@ func StartHttpServer(
 		}
 		CallStartHooks()
 	}
+
+	//解决http服务通过hub信号重启报错的问题
+	_ = server.RegisterSignalHook(endless.PRE_SIGNAL, syscall.SIGHUP, func() {
+		if commandMain != "" {
+			os.Args = append([]string{commandMain}, os.Args...)
+		}
+	})
+	_ = server.RegisterSignalHook(endless.POST_SIGNAL, syscall.SIGHUP, func() {
+		if commandMain != "" {
+			os.Args = os.Args[1:]
+		}
+	})
+
 	_ = server.RegisterSignalHook(endless.POST_SIGNAL, syscall.SIGINT, CallShutdownHooks)
 	_ = server.RegisterSignalHook(endless.POST_SIGNAL, syscall.SIGTERM, CallShutdownHooks)
 
