@@ -83,12 +83,12 @@ func (s *CMapShard[K, V]) LoadOrCreate(key K, create func(key K) V) (val V, load
 }
 
 // LoadOrCreateCb 跟LoadOrCreate，直接不返回而是改成回调，并且cb函数会在锁环境中调用
-func (s *CMapShard[K, V]) LoadOrCreateF(key K, create func(key K) V, read func(val V, loaded bool)) {
+func (s *CMapShard[K, V]) LoadOrCreateF(key K, create func(key K) V, cb func(val V, loaded bool)) {
 	//先上读锁，判断是否存在，存在则回调
 	s.lock.RLock()
 	val, ok := s.items[key]
 	if ok {
-		read(val, ok)
+		cb(val, ok)
 		s.lock.RUnlock()
 		return
 	}
@@ -100,15 +100,29 @@ func (s *CMapShard[K, V]) LoadOrCreateF(key K, create func(key K) V, read func(v
 		val = create(key)
 		s.items[key] = val
 	}
-	read(val, ok)
+	cb(val, ok)
 	s.lock.Unlock()
 }
 
 // Delete 删除当前槽元素
-func (s *CMapShard[K, V]) Delete(key K) {
+func (s *CMapShard[K, V]) Delete(key K) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	delete(s.items, key)
+	_, ok := s.items[key]
+	if ok {
+		delete(s.items, key)
+	}
+	return ok
+}
+
+func (s *CMapShard[K, V]) DeleteCb(key K, cb func(val V, exists bool)) {
+	s.lock.Lock()
+	val, ok := s.items[key]
+	if ok {
+		delete(s.items, key)
+	}
+	cb(val, ok)
+	s.lock.Unlock()
 }
 
 func (s *CMapShard[K, V]) Lock(f func(items map[K]V)) {
@@ -180,8 +194,12 @@ func (m *CMap[K, V]) LoadOrCreate(key K, create func(key K) V) (val V, loaded bo
 	return m.GetShard(key).LoadOrCreate(key, create)
 }
 
-func (m *CMap[K, V]) Delete(key K) {
-	m.GetShard(key).Delete(key)
+func (m *CMap[K, V]) Delete(key K) bool {
+	return m.GetShard(key).Delete(key)
+}
+
+func (m *CMap[K, V]) DeleteCb(key K, cb func(val V, exists bool)) {
+	m.GetShard(key).DeleteCb(key, cb)
 }
 
 // Range 遍历元素，如果函数f返回false，则中断遍历
@@ -207,6 +225,17 @@ func (m *CMap[K, V]) Reset() []map[K]V {
 		})
 	}
 	return ret
+}
+
+func (m *CMap[K, V]) ClearCb(cb func(key K, val V)) {
+	for i, shard := range m.shards {
+		shard.Lock(func(items map[K]V) {
+			for k, v := range items {
+				cb(k, v)
+			}
+			m.shards[i].items = make(map[K]V)
+		})
+	}
 }
 
 func cMapFnv32(s string) uint32 {
