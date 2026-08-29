@@ -5,9 +5,13 @@ import (
 )
 
 type InsertBuilderInterface interface {
+	// InitArgs 初始化总共有几行数据
 	InitArgs(capacity int)
+	// AppendArgs 添加数据，rowIdx表示第几行数据，从0开始
 	AppendArgs(rowIdx int, args ...interface{})
+	AppendBean(rowIdx int, db *DBInstance, bean interface{}) error
 	TakeArgs() (ret []interface{})
+	SetTable(t string)
 	GetTable() string
 }
 
@@ -21,7 +25,9 @@ type InsertBuilder struct {
 	sql      *strings.Builder
 	args     []interface{}
 	argsIdx  int
-	Table    string
+	table    string
+	colsMap  map[string]int
+	colsStr  string
 }
 
 func NewInsertBuilder(
@@ -52,14 +58,16 @@ func NewInsertBuilder(
 	default:
 		colsStr = "`" + strings.Join(cols, "`,`") + "`"
 	}
-	sql1 := op + " into " + table + "(" + colsStr + ") values"
+	var sql1 = op + " into " // + table + "(" + colsStr + ") values"
 	//第二部分
 	var sql2 string
+	var colsMap = make(map[string]int)
 	{
 		var tmp strings.Builder
 		tmp.Grow(2 + len(cols)*2 - 1)
 		tmp.WriteByte('(')
-		for i, _ := range cols {
+		for i, col := range cols {
+			colsMap[col] = i
 			tmp.WriteByte('?')
 			if i < len(cols)-1 {
 				tmp.WriteByte(',')
@@ -74,11 +82,13 @@ func NewInsertBuilder(
 		sql3 = " on conflict do nothing"
 	}
 	return &InsertBuilder{
-		cols:  len(cols),
-		sql1:  sql1,
-		sql2:  sql2,
-		sql3:  sql3,
-		Table: table,
+		cols:    len(cols),
+		sql1:    sql1,
+		sql2:    sql2,
+		sql3:    sql3,
+		table:   table,
+		colsStr: "(" + colsStr + ") values",
+		colsMap: colsMap,
 	}
 }
 
@@ -87,8 +97,10 @@ func (m *InsertBuilder) InitArgs(capacity int) {
 	//构建sql
 	m.sql = &strings.Builder{}
 	// len("insert into xxx(...) values") + capacity * len("(?,?,...)") + (capacity - 1) * len(",")
-	m.sql.Grow(len(m.sql1) + len(m.sql2)*capacity + len(m.sql3) + capacity - 1)
+	m.sql.Grow(len(m.sql1) + len(m.table) + len(m.colsStr) + len(m.sql2)*capacity + len(m.sql3) + capacity - 1)
 	m.sql.WriteString(m.sql1)
+	m.sql.WriteString(m.table)
+	m.sql.WriteString(m.colsStr)
 	//构建参数
 	m.args = make([]interface{}, capacity*m.cols+1)
 }
@@ -107,6 +119,35 @@ func (m *InsertBuilder) AppendArgs(rowIdx int, args ...interface{}) {
 	m.argsIdx = j + m.cols
 }
 
+func (m *InsertBuilder) AppendBean(rowIdx int, db *DBInstance, bean interface{}) error {
+	table, err := db.TableInfo(m.table)
+	if err != nil {
+		return err
+	}
+	args := make([]interface{}, len(m.colsMap))
+	for _, col := range table.Columns() {
+		idx, ok := m.colsMap[col.Name]
+		if !ok {
+			continue
+		}
+
+		fieldValuePtr, err := col.ValueOf(bean)
+		if err != nil {
+			return err
+		}
+		fieldValue := *fieldValuePtr
+
+		arg, err := db.Value2Interface(col, fieldValue)
+		if err != nil {
+			return err
+		}
+		args[idx] = arg
+	}
+	m.AppendArgs(rowIdx, args...)
+	return nil
+}
+
+// TakeArgs 支持数量没有达到capacity，也可以正确获取数据
 func (m *InsertBuilder) TakeArgs() (ret []interface{}) {
 	//第一个参数是sql
 	m.sql.WriteString(m.sql3)
@@ -122,6 +163,11 @@ func (m *InsertBuilder) TakeArgs() (ret []interface{}) {
 	return ret
 }
 
+// SetTable 重新设置表明，必须在InitArgs调用
+func (m *InsertBuilder) SetTable(t string) {
+	m.table = t
+}
+
 func (m *InsertBuilder) GetTable() string {
-	return m.Table
+	return m.table
 }

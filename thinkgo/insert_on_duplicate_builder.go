@@ -8,7 +8,6 @@ import (
 // InsertOnDuplicateBuilder 构建mysql的insert on duplicate key update的批量操作
 type InsertOnDuplicateBuilder struct {
 	cols     int
-	sql1     string // "insert into xxx(...) values"
 	sql2     string // "(?,?,...)"
 	sql3     string // " on duplicate key update `col`=values(`col`)" or " on conflict(...) do update set `col`=excluded.`col`"
 	capacity int
@@ -16,6 +15,7 @@ type InsertOnDuplicateBuilder struct {
 	args     []interface{}
 	argsIdx  int
 	table    string
+	colsMap  map[string]int
 	colsStr  string
 }
 
@@ -44,7 +44,7 @@ func NewInsertOnDuplicateBuilder1(
 		colsStr = "`" + strings.Join(cols, "`,`") + "`"
 	}
 
-	sql1 := "insert into " + table + "(" + colsStr + ") values"
+	//var sql1 = "insert into " + table + "(" + colsStr + ") values"
 	//第二部分
 	var sql2 string
 	{
@@ -62,11 +62,13 @@ func NewInsertOnDuplicateBuilder1(
 	}
 	//第三部分
 	var sql3 string
+	var colsMap = make(map[string]int, len(cols))
 	if driver == "postgres" {
 		//pgsql
 		tmp1 := make([]string, 0, keyNum)
 		tmp2 := make([]string, 0, len(cols)-keyNum)
 		for i, col := range cols {
+			colsMap[col] = i
 			if i < keyNum {
 				tmp1 = append(tmp1, "\""+col+"\"")
 			} else {
@@ -84,6 +86,7 @@ func NewInsertOnDuplicateBuilder1(
 		//mysql
 		tmp := make([]string, 0, len(cols)-keyNum)
 		for i, col := range cols {
+			colsMap[col] = i
 			if i < keyNum {
 				continue
 			}
@@ -99,11 +102,11 @@ func NewInsertOnDuplicateBuilder1(
 	}
 	return &InsertOnDuplicateBuilder{
 		cols:    len(cols),
-		sql1:    sql1,
 		sql2:    sql2,
 		sql3:    sql3,
 		table:   table,
-		colsStr: colsStr,
+		colsMap: colsMap,
+		colsStr: "(" + colsStr + ") values",
 	}
 }
 
@@ -112,8 +115,11 @@ func (m *InsertOnDuplicateBuilder) InitArgs(capacity int) {
 	//构建sql
 	m.sql = &strings.Builder{}
 	// len("insert into xxx(...) values") + capacity * len("(?,?,...)") + (capacity - 1) * len(",") + len(" on duplicate key update ...")
-	m.sql.Grow(len(m.sql1) + len(m.sql2)*capacity + capacity - 1 + len(m.sql3))
-	m.sql.WriteString(m.sql1)
+	//sql1 = "insert into " + table + "(" + colsStr + ") values"
+	m.sql.Grow(12 + len(m.table) + len(m.colsStr) + len(m.sql2)*capacity + capacity - 1 + len(m.sql3))
+	m.sql.WriteString("insert into ")
+	m.sql.WriteString(m.table)
+	m.sql.WriteString(m.colsStr)
 	//构建参数
 	m.args = make([]interface{}, capacity*m.cols+1)
 }
@@ -132,6 +138,34 @@ func (m *InsertOnDuplicateBuilder) AppendArgs(rowIdx int, args ...interface{}) {
 	m.argsIdx = j + m.cols
 }
 
+func (m *InsertOnDuplicateBuilder) AppendBean(rowIdx int, db *DBInstance, bean interface{}) error {
+	table, err := db.TableInfo(m.table)
+	if err != nil {
+		return err
+	}
+	args := make([]interface{}, len(m.colsMap))
+	for _, col := range table.Columns() {
+		idx, ok := m.colsMap[col.Name]
+		if !ok {
+			continue
+		}
+
+		fieldValuePtr, err := col.ValueOf(bean)
+		if err != nil {
+			return err
+		}
+		fieldValue := *fieldValuePtr
+
+		arg, err := db.Value2Interface(col, fieldValue)
+		if err != nil {
+			return err
+		}
+		args[idx] = arg
+	}
+	m.AppendArgs(rowIdx, args...)
+	return nil
+}
+
 // TakeArgs 支持数量没有达到capacity，也可以正确获取数据
 func (m *InsertOnDuplicateBuilder) TakeArgs() (ret []interface{}) {
 	//第一个参数是sql
@@ -148,9 +182,9 @@ func (m *InsertOnDuplicateBuilder) TakeArgs() (ret []interface{}) {
 	return ret
 }
 
+// SetTable 重新设置表明，必须在InitArgs调用
 func (m *InsertOnDuplicateBuilder) SetTable(t string) {
 	m.table = t
-	m.sql1 = "insert into " + t + "(" + m.colsStr + ") values"
 }
 
 func (m *InsertOnDuplicateBuilder) GetTable() string {
