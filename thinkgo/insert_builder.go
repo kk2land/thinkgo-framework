@@ -14,7 +14,7 @@ type InsertBuilderInterface interface {
 	TakeArgs() (ret []interface{})
 	SetTable(t string)
 	GetTable() string
-	Exec() error
+	Exec(db *DBInstance) error
 }
 
 // InsertBuilder 构建mysql的insert ignore的批量操作
