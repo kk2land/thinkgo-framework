@@ -1,6 +1,7 @@
 package thinkgo
 
 import (
+	"fmt"
 	"strings"
 	"time"
 )
@@ -122,9 +123,9 @@ func (m *InsertBuilder) AppendArgs(rowIdx int, args ...interface{}) {
 }
 
 func (m *InsertBuilder) AppendBean(rowIdx int, db *DBInstance, bean interface{}) error {
-	table, err := db.TableInfo(m.table)
+	table, err := db.TableInfo(bean)
 	if err != nil {
-		return err
+		return fmt.Errorf("TableInfo err:%v", err)
 	}
 	args := make([]interface{}, len(m.colsMap))
 	for _, col := range table.Columns() {

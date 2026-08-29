@@ -20,20 +20,22 @@ type InsertOnDuplicateBuilder struct {
 	colsStr  string
 }
 
+// NewInsertOnDuplicateBuilder keyNum前几列是key
 func NewInsertOnDuplicateBuilder(
 	driver string,
 	table string,
 	cols []string,
-	keyNum int, //前几列是key
+	keyNum int,
 ) *InsertOnDuplicateBuilder {
 	return NewInsertOnDuplicateBuilder1(driver, table, cols, keyNum, nil)
 }
 
+// NewInsertOnDuplicateBuilder1 keyNum前几列是key
 func NewInsertOnDuplicateBuilder1(
 	driver string,
 	table string,
 	cols []string,
-	keyNum int,                //前几列是key
+	keyNum int,
 	colExps map[string]string, //upsert的额外表达式，"col"=excluded."col"，如果是""空字符串，那就跳过该字段的update
 ) *InsertOnDuplicateBuilder {
 	//第一部分
@@ -140,9 +142,9 @@ func (m *InsertOnDuplicateBuilder) AppendArgs(rowIdx int, args ...interface{}) {
 }
 
 func (m *InsertOnDuplicateBuilder) AppendBean(rowIdx int, db *DBInstance, bean interface{}) error {
-	table, err := db.TableInfo(m.table)
+	table, err := db.TableInfo(bean)
 	if err != nil {
-		return err
+		return fmt.Errorf("TableInfo err:%v", err)
 	}
 	args := make([]interface{}, len(m.colsMap))
 	for _, col := range table.Columns() {

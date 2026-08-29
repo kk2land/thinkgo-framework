@@ -126,7 +126,7 @@ func (db *DBInstance) Value2Interface(col *schemas.Column, fieldValue reflect.Va
 			//	return pkField.Interface(), nil
 			//}
 			//return nil, fmt.Errorf("no primary key for col %v", col.Name)
-			return nil, fmt.Errorf("Unsupported type %v", fieldValue.Type())
+			return nil, fmt.Errorf("Unsupported table type %v", fieldValue.Type())
 		}
 
 		if col.SQLType.IsText() {
