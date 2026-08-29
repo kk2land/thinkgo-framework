@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"xorm.io/xorm"
 )
 
 // InsertOnDuplicateBuilder 构建mysql的insert on duplicate key update的批量操作
@@ -141,7 +143,7 @@ func (m *InsertOnDuplicateBuilder) AppendArgs(rowIdx int, args ...interface{}) {
 	m.argsIdx = j + m.cols
 }
 
-func (m *InsertOnDuplicateBuilder) AppendBean(rowIdx int, db *DBInstance, bean interface{}) error {
+func (m *InsertOnDuplicateBuilder) AppendBean(rowIdx int, db xorm.EngineInterface, bean interface{}) error {
 	table, err := db.TableInfo(bean)
 	if err != nil {
 		return fmt.Errorf("TableInfo err:%v", err)
@@ -159,7 +161,7 @@ func (m *InsertOnDuplicateBuilder) AppendBean(rowIdx int, db *DBInstance, bean i
 		}
 		fieldValue := *fieldValuePtr
 
-		arg, err := db.Value2Interface(col, fieldValue)
+		arg, err := Value2Interface(db, col, fieldValue)
 		if err != nil {
 			return err
 		}

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"xorm.io/xorm"
 )
 
 type InsertBuilderInterface interface {
@@ -11,7 +13,7 @@ type InsertBuilderInterface interface {
 	InitArgs(capacity int)
 	// AppendArgs 添加数据，rowIdx表示第几行数据，从0开始
 	AppendArgs(rowIdx int, args ...interface{})
-	AppendBean(rowIdx int, db *DBInstance, bean interface{}) error
+	AppendBean(rowIdx int, db xorm.EngineInterface, bean interface{}) error
 	TakeArgs() (ret []interface{})
 	SetTable(t string)
 	GetTable() string
@@ -122,7 +124,7 @@ func (m *InsertBuilder) AppendArgs(rowIdx int, args ...interface{}) {
 	m.argsIdx = j + m.cols
 }
 
-func (m *InsertBuilder) AppendBean(rowIdx int, db *DBInstance, bean interface{}) error {
+func (m *InsertBuilder) AppendBean(rowIdx int, db xorm.EngineInterface, bean interface{}) error {
 	table, err := db.TableInfo(bean)
 	if err != nil {
 		return fmt.Errorf("TableInfo err:%v", err)
@@ -140,7 +142,7 @@ func (m *InsertBuilder) AppendBean(rowIdx int, db *DBInstance, bean interface{})
 		}
 		fieldValue := *fieldValuePtr
 
-		arg, err := db.Value2Interface(col, fieldValue)
+		arg, err := Value2Interface(db, col, fieldValue)
 		if err != nil {
 			return err
 		}
