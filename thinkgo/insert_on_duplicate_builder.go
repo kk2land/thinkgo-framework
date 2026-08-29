@@ -3,6 +3,7 @@ package thinkgo
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 // InsertOnDuplicateBuilder 构建mysql的insert on duplicate key update的批量操作
@@ -189,4 +190,15 @@ func (m *InsertOnDuplicateBuilder) SetTable(t string) {
 
 func (m *InsertOnDuplicateBuilder) GetTable() string {
 	return m.table
+}
+
+func (m *InsertOnDuplicateBuilder) Exec(db *DBInstance) error {
+	args := m.TakeArgs()
+	return db.ExecWithBackoff(
+		BackoffPolicyDefault(300*time.Millisecond, 10),
+		func(instance *DBInstance) error {
+			_, err := instance.Exec(args...)
+			return err
+		},
+	)
 }

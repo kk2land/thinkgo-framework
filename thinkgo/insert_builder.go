@@ -2,6 +2,7 @@ package thinkgo
 
 import (
 	"strings"
+	"time"
 )
 
 type InsertBuilderInterface interface {
@@ -13,6 +14,7 @@ type InsertBuilderInterface interface {
 	TakeArgs() (ret []interface{})
 	SetTable(t string)
 	GetTable() string
+	Exec() error
 }
 
 // InsertBuilder 构建mysql的insert ignore的批量操作
@@ -170,4 +172,15 @@ func (m *InsertBuilder) SetTable(t string) {
 
 func (m *InsertBuilder) GetTable() string {
 	return m.table
+}
+
+func (m *InsertBuilder) Exec(db *DBInstance) error {
+	args := m.TakeArgs()
+	return db.ExecWithBackoff(
+		BackoffPolicyDefault(300*time.Millisecond, 10),
+		func(instance *DBInstance) error {
+			_, err := instance.Exec(args...)
+			return err
+		},
+	)
 }
