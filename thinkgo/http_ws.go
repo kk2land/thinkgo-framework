@@ -228,7 +228,9 @@ func (m *HttpWsConn[T]) TryWriteBytes(b []byte) {
 // Close 关闭wsConn
 func (m *HttpWsConn[T]) Close() {
 	if m.writeClosed.CompareAndSwap(false, true) {
+		m.writeLock.Lock()
 		close(m.closeChannel)
+		m.writeLock.Unlock()
 	}
 }
 
@@ -391,7 +393,7 @@ func (m *HttpWsConn[T]) Start() error {
 				m.close(HttpWsConnCloseFromClient, err)
 				return err1
 			}
-			m.logger.Errorf("ReadMessage fail,err=%s", err)
+			//m.logger.Errorf("ReadMessage fail,err=%s", err)
 			if ErrIsTimeout(err) {
 				m.close(HttpWsConnCloseFromNoPong, err)
 			} else {
@@ -416,6 +418,16 @@ func (m *HttpWsConn[T]) Start() error {
 }
 
 func (m *HttpWsConn[T]) close(from int, err error) {
+	if m.writeClosed.Load() {
+		return
+	}
+
+	m.writeLock.RLock()
+	defer m.writeLock.RUnlock()
+
+	if m.writeClosed.Load() {
+		return
+	}
 	select {
 	case m.closeChannel <- &httpWsConnCloseData{from, err}:
 	default:
