@@ -284,11 +284,11 @@ loop:
 		select {
 		case data := <-m.closeChannel:
 			if data == nil {
-				m.logger.Infof("正常退出,%s", suffix())
+				m.logger.Debugf("正常退出-%s", suffix())
 				m.onClose(m, HttpWsConnCloseFromNormal, nil, writeNoNetErr)
 			} else {
 				if data.from == HttpWsConnCloseFromClient {
-					m.logger.Warnf("客户端退出-%s", suffix())
+					m.logger.Debugf("客户端退出-%s", suffix())
 				} else {
 					m.logger.Warnf("异常退出-%d,%v,%s", data.from, data.err, suffix())
 				}
@@ -331,7 +331,7 @@ loop:
 			}
 		}
 	}
-	m.logger.Infof("开始退出write协程,%s", suffix())
+	m.logger.Debugf("开始退出write协程-%s", suffix())
 	//启动一个协程来消耗writeChannel/controlChannel
 	go func() {
 		for {
@@ -360,7 +360,7 @@ loop:
 	//将wsConn从router中移除
 	m.router.closeConn(key, m)
 	_ = m.conn.Close()
-	m.logger.Infof("结束退出write协程,%s", suffix())
+	m.logger.Debugf("结束退出write协程-%s", suffix())
 }
 
 func (m *HttpWsConn[T]) Start() error {
@@ -380,7 +380,7 @@ func (m *HttpWsConn[T]) Start() error {
 	//启动write协程
 	go m.goWrite()
 
-	m.logger.Infof("开始ReadMessage")
+	m.logger.Debug("开始ReadMessage")
 	var b []byte
 	var msg T
 
