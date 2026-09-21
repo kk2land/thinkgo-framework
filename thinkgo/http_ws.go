@@ -292,7 +292,7 @@ loop:
 				if data.from == HttpWsConnCloseFromClient {
 					m.logger.Debugf("客户端退出-%s", suffix())
 				} else {
-					m.logger.Warnf("异常退出-%d,%v,%s", data.from, data.err, suffix())
+					m.logger.Debugf("异常退出-%d,%v,%s", data.from, data.err, suffix())
 				}
 				switch data.from {
 				// 以下close类型，在关闭前可以发送数据到客户端
