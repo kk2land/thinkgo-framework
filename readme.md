@@ -4,8 +4,7 @@
 
 添加框架依赖
 ```bash
-go env -w GOPRIVATE="git.hy545.cc/crypto/*"
-go get git.hy545.cc/crypto/thinkgo-framework
+go get github.com/kk2land/thinkgo-framework
 ```
 1. 将`app_init.sh`和`hook_pull.sh`复制到项目根目录下.
 
