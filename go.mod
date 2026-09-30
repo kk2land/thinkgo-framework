@@ -1,4 +1,4 @@
-module git.hy545.cc/crypto/thinkgo-framework
+module github.com/kk2land/thinkgo-framework
 
 go 1.23.0
 
