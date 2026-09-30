@@ -2,9 +2,11 @@
 
 ## 目的
 
-本文面向在其他业务项目中工作的 Codex / 开发者。
+本文面向在其他业务项目中工作的 AI Coding Agent / 开发者。
 
-当项目依赖 `git.hy545.cc/crypto/thinkgo-framework`，并且代码里出现 `git.hy545.cc/crypto/thinkgo-framework/thinkgo` 时，优先参考本文判断框架已经提供了哪些能力，避免重复封装 HTTP、日志、Redis、数据库、锁、缓存或并发工具。
+当项目依赖 `github.com/kk2land/thinkgo-framework`，并且代码里出现 `github.com/kk2land/thinkgo-framework/thinkgo` 时，优先参考本文判断框架已经提供了哪些能力，避免重复封装 HTTP、日志、Redis、数据库、锁、缓存或并发工具。
+
+> Agent 应先阅读 [`AGENTS.md`](./AGENTS.md) 获取开发决策规则，再按需使用本文查询具体能力和 API。
 
 ## 一句话总结
 
@@ -12,11 +14,11 @@
 
 ## 快速识别
 
-- `go.mod` 通常会依赖 `git.hy545.cc/crypto/thinkgo-framework`
-- 业务代码常见导入包是 `git.hy545.cc/crypto/thinkgo-framework/thinkgo`
+- `go.mod` 通常会依赖 `github.com/kk2land/thinkgo-framework`
+- 业务代码常见导入包是 `github.com/kk2land/thinkgo-framework/thinkgo`
 - 项目通常会有 `app/config`、`app/runtime`、`app/bin`
 - 如果项目启用了 module 模式，还会有 `app/{module}/config`、`app/{module}/runtime`、`app/{module}/bin`
-- 编译脚本可能通过 `-ldflags "-X git.hy545.cc/crypto/thinkgo-framework/thinkgo.ModuleName=xxx"` 注入模块名
+- 编译脚本可能通过 `-ldflags "-X github.com/kk2land/thinkgo-framework/thinkgo.ModuleName=xxx"` 注入模块名
 
 ## 运行时模型
 
@@ -276,7 +278,7 @@ WebSocket 不只是简单 upgrade，还额外提供了连接管理层。
 - `DBErrRetry()` 判断是否适合重试
 - `DBErrDuplicate()` 判断是否唯一键冲突
 
-对 Codex 的理解建议：
+对 Agent / 开发者的理解建议：
 
 - 复杂数据库能力依然主要来自 `xorm`
 - 框架提供的是实例创建、配置装配、日志和重试判断，不是新的 ORM
@@ -311,7 +313,7 @@ Redis 层本质上是 `go-redis/v8` 的运行时封装。
 - `Raw()` 暴露原始 `*redis.Client`
 - 额外 Lua 辅助命令 `SetExf()`、`IncrEx()`、`IncrByEx()`
 
-对 Codex 的理解建议：
+对 Agent / 开发者的理解建议：
 
 - `RedisClient` 已经代理了大部分常用 `Cmdable` 能力，很多时候不需要自己再包一层
 - 如果直接用 `Raw()`，记得通过 `Prefix()` 或 `Prefixes()` 处理 key 前缀
@@ -511,7 +513,7 @@ Redis 层本质上是 `go-redis/v8` 的运行时封装。
 - 自动安装 `godoc`
 - 本地启动包文档服务
 
-## 给 Codex 的使用约定
+## 给 Agent / 开发者的使用约定
 
 ### 1. 先判断框架是否已经有现成能力
 
@@ -548,8 +550,8 @@ Redis 层本质上是 `go-redis/v8` 的运行时封装。
 
 也就是说：
 
-- 如果你要改数据库查询语义，通常还是查 `xorm` 用法
-- 如果你要做复杂 Redis 操作，通常还是参考 `go-redis` 能力
+- 如果要改数据库查询语义，通常还是查 `xorm` 用法
+- 如果要做复杂 Redis 操作，通常还是参考 `go-redis` 能力
 - 但实例获取、配置装配、日志、重试和前缀处理，应该优先复用框架
 
 ### 4. 注意 import 即初始化
@@ -559,7 +561,7 @@ Redis 层本质上是 `go-redis/v8` 的运行时封装。
 - 不是等到 `main()` 里才初始化
 - 而是导入 `thinkgo` 包时就会初始化路径、配置、日志、Redis
 
-所以在 Codex 修改业务项目时：
+所以 Agent / 开发者修改业务项目时：
 
 - 不要轻易把 `thinkgo` 引入到一个脱离项目目录结构的独立工具中
 - 写测试或脚本时，先确认 `app/`、配置文件和环境变量是否齐全
