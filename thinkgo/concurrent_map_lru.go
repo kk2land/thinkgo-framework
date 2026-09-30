@@ -1,7 +1,7 @@
 package thinkgo
 
 import (
-	"git.hy545.cc/crypto/thinkgo-framework/lru"
+	"github.com/kk2land/thinkgo-framework/lru"
 	"math"
 	"sync"
 	"time"
