@@ -40,12 +40,7 @@ import "github.com/kk2land/thinkgo-framework/thinkgo"
 
 它主要负责基础设施的统一装配和公共能力复用。
 
-它不是：
-
-- DI 容器
-- 完整业务脚手架平台
-- 新的 ORM
-- 新的 Redis 协议层
+它不是：DI 容器、完整业务脚手架平台、新的 ORM 或新的 Redis 协议层。
 
 数据库能力主要建立在 `xorm` 上；Redis 能力主要建立在 `go-redis/v8` 上。ThinkGo 负责实例创建、配置、日志、重试、前缀和生命周期等运行时能力。
 
@@ -56,36 +51,29 @@ import "github.com/kk2land/thinkgo-framework/thinkgo"
 导入 `thinkgo` 包时，框架 `init()` 会立即执行，包括：
 
 - 推导项目路径
-- 加载 `.env`
+- 加载系统级 env 文件（如 `_TK_SYSTEM_ENV` 指定且存在）和项目 `.env`
 - 加载 TOML 配置
 - 初始化全局 `Config`
 - 初始化全局 `Logger`
-- 初始化相关运行时设施
+- 初始化 Redis 运行时
 - 注册 start / shutdown hook
 
-因此不要随意在脱离标准项目目录的临时程序或测试中导入 `thinkgo`。
+因此不要随意在脱离标准项目目录的临时程序或测试中导入 `thinkgo`。必要时可通过 `_TK_RootPath` 指定项目根目录。
 
-必要时可通过 `_TK_RootPath` 指定项目根目录。
+### 常用环境变量
+
+- `_TK_RootPath`：显式指定项目根目录
+- `_TK_AppStatus`：运行环境，并参与环境配置文件选择
+- `_TK_AppDebug`：`1` 时显式开启 debug
+- `_TK_LogConsole`：`1` 时将日志直接输出到控制台
+- `_TK_Command`：覆盖当前逻辑命令名
+- `_TK_SYSTEM_ENV`：指定额外系统级 env 文件，在项目 `.env` 之前加载
 
 ### 常用全局运行时变量
 
-重点关注：
-
-- `ModuleName`
-- `InModule`
-- `RootPath`
-- `AppPath`
-- `RuntimePath`
-- `CommandName`
-- `AppName`
-- `AppStatus`
-- `AppDebug`
-- `Config`
-- `Logger`
+重点关注：`ModuleName`、`InModule`、`RootPath`、`AppPath`、`RuntimePath`、`CommandName`、`AppName`、`AppStatus`、`AppDebug`、`Hostname`、`Pid`、`Config`、`Logger`。
 
 ### 标准目录
-
-业务项目通常具有：
 
 ```text
 app/
@@ -96,7 +84,7 @@ app/
   bin/
 ```
 
-module 模式下通常为：
+module 模式下应用目录通常为：
 
 ```text
 app/{module}/
@@ -105,29 +93,34 @@ app/{module}/
   bin/
 ```
 
+注意：module 模式仍会先读取公共的 `app/config`，再读取 `app/{module}/config` 进行叠加。
+
 ## 4. 能力选择速查
 
 | 需求 | 优先检查 |
 | --- | --- |
 | 配置 / 环境变量 | `config.go` |
 | 生命周期 / 命令 / PID | `base.go` |
-| 日志 | `logger.go` |
+| 日志 / 运维告警 | `logger.go`, `base.go` |
 | HTTP / Gin | `http_server.go` |
 | WebSocket | `http_ws.go` |
 | gRPC | `grpc_server.go` |
 | 数据库 | `database.go` |
-| Redis | `redis.go`, `redis_client.go` |
+| DB 字段值转换 | `database_values.go` |
+| Redis | `redis.go`, `redis_client.go`, `redis_client_extra.go` |
 | 本地 / Redis / MySQL 锁 | `key_lock.go` |
 | 本地 + Backend 缓存 | `key_store.go`, `key_store_backend.go` |
 | Leader 选举 | `leader.go` |
 | GatewayWorker 客户端 | `gateway_client.go` |
 | 批量 Insert / Upsert | `insert_builder.go`, `insert_on_duplicate_builder.go` |
 | 并发 Map / LRU | `concurrent_map.go`, `concurrent_map_lru.go` |
+| `sync.Map` 泛型封装 | `sync_map.go` |
 | 串行任务队列 | `util_go_queue.go` |
+| 超时 Once / 分钟 Ticker | `timeout_once.go`, `minutes_ticker.go` |
 | Backoff | `backoff.go` |
 | 动态 JSON | `jmap.go` |
 | 类型转换 | `conv_*.go` |
-| 通用工具 | `util*.go` |
+| 通用工具 / panic / error | `util*.go` |
 
 详细能力、入口函数和注意事项见 [`USAGE.md`](./USAGE.md)。
 
@@ -136,7 +129,7 @@ app/{module}/
 处理使用 ThinkGo 的业务项目时，按以下顺序工作：
 
 1. 确认业务项目是否依赖 `github.com/kk2land/thinkgo-framework`。
-2. 检查项目的 `app/config/*.toml`、`.env`、启动入口和构建脚本。
+2. 检查项目的 `app/config/*.toml`、`.env`、启动入口和构建脚本；module 模式同时检查 `app/{module}/config/*.toml`。
 3. 阅读本文件和 `USAGE.md` 中与需求对应的章节。
 4. 搜索 `thinkgo/` 中已有类型和函数，确认真实 API 和行为。
 5. 搜索业务项目已有用法，优先保持现有项目风格。
@@ -147,51 +140,43 @@ app/{module}/
 
 ## 6. 常见决策规则
 
+### 配置
+
+优先复用全局 `Config` 和框架的配置合并机制。需要获取配置文件路径时检查 `GetAppConfigPath()` / `GetConfigPath()`，不要自行拼接 module 路径。
+
 ### HTTP
 
-优先使用框架提供的 `HttpEngine()`、`HttpRouter()`、`HttpRouterWithPath()`、统一错误处理和请求日志机制。
-
-不要无必要重新创建独立 Gin Engine 或另一套 recovery / request logger。
+优先使用框架提供的 `HttpEngine()`、`HttpRouter()`、`HttpRouterWithPath()`、统一错误处理和请求日志机制。不要无必要重新创建独立 Gin Engine 或另一套 recovery / request logger。
 
 ### DB
 
-优先通过 `DBDefault()` / `DB(name)` 获取实例。
-
-查询和 ORM 语义按 xorm 使用；实例装配、日志、连接池和重试优先沿用 ThinkGo。
+优先通过 `DBDefault()` / `DB(name)` 获取实例。查询和 ORM 语义按 xorm 使用；实例装配、日志、连接池和重试优先沿用 ThinkGo。
 
 ### Redis
 
-优先通过 `RedisDefault()` / `Redis(name)` 获取 `RedisClient`。
-
-不要为了几个 Redis 命令重新封装一层 client。使用 `Raw()` 时注意框架 key prefix 规则。
+优先通过 `RedisDefault()` / `Redis(name)` 获取 `RedisClient`。不要为了几个 Redis 命令重新封装一层 client。使用 `Raw()` 时注意框架 key prefix 规则。
 
 ### 锁
 
-先根据范围选择：
-
-- 单进程：`KeyLockMem*`
-- 跨进程且已有 Redis：`KeyLockRedis*`
-- 依赖 MySQL 锁：`KeyLockMySQL*`
-
-不要用普通 Redis `SETNX` 在业务代码中重新实现已有锁语义。
+先根据范围选择：单进程使用 `KeyLockMem*`；跨进程且已有 Redis 使用 `KeyLockRedis*`；依赖 MySQL 锁时使用 `KeyLockMySQL*`。不要用普通 Redis `SETNX` 在业务代码中重新实现已有锁语义。
 
 ### 缓存
 
-简单本地并发缓存优先检查 `CMapLRU` / `lru.Cache`。
-
-需要“本地缓存 + 后端回源/写入”时优先检查 `KeyStore`。
+简单本地并发缓存优先检查 `CMapLRU` / `lru.Cache`；需要“本地缓存 + 后端回源/写入”时优先检查 `KeyStore`。
 
 ### 后台 goroutine
 
-需要 panic 防护时优先检查 `SafeGo()` / `SafeGo1()`；需要串行消费时优先检查 `GoQueue`。
+需要 panic 防护时优先检查 `SafeGo()` / `SafeGo1()`；需要串行消费时优先检查 `GoQueue`。需要跟随服务退出的后台任务，应接入框架 shutdown 生命周期，而不是创建无法退出的 goroutine。
 
-需要跟随服务退出的后台任务，应检查并接入框架 shutdown 生命周期，而不是创建无法退出的 goroutine。
+### 错误与 panic
+
+通用错误判断和 panic 转换先检查 `ErrIsTimeout()`、`ErrIsBrokenPipe()`、`Recover2Error()`、`LogErrAndPanic()`。不要在业务层重复写同类低层判断。
 
 ## 7. Agent 禁止的默认做法
 
 除非需求明确或现有框架确实无法满足，否则不要：
 
-- 再创建一套配置加载器
+- 再创建一套配置加载器或自行改变配置覆盖顺序
 - 再创建全局 logger
 - 再封装一套 DB / Redis manager
 - 再实现 Redis 分布式锁
@@ -199,6 +184,7 @@ app/{module}/
 - 为已有轻量能力随意引入新第三方依赖
 - 绕过框架生命周期启动永久 goroutine
 - 假设导入 `thinkgo` 没有副作用
+- 绕过 Redis key prefix 约定直接混用 `Raw()`
 - 在未阅读源码时改变框架关键运行时语义
 
 ## 8. 框架当前边界
@@ -225,8 +211,18 @@ app/{module}/
 - 修改 DB / Redis wrapper 时避免破坏底层 xorm / go-redis 的既有使用方式。
 - 新增基础设施能力前判断它是否属于框架层，而不是特定业务逻辑。
 - 新能力应同步更新 `USAGE.md`，必要时更新本文件的能力速查表。
+- 新增公开 API 时，应让命名、错误语义和生命周期行为与现有框架保持一致。
 
-## 10. 文档优先级
+## 10. 文档维护规则
+
+修改框架能力时同步维护文档：
+
+- 新增/删除公共能力：更新 `USAGE.md`，并检查本文件的能力速查表。
+- 修改初始化、配置、生命周期、DB/Redis、HTTP/gRPC/WebSocket 等关键行为：必须更新对应说明。
+- 修改 module path、目录结构、环境变量或构建方式：同步更新 `readme.md`、`AGENTS.md`、`USAGE.md` 中相关内容。
+- 文档不要复制整份源码 API；记录 Agent 做决策真正需要的入口、语义、边界和陷阱。
+
+## 11. 文档优先级
 
 Agent 获取框架信息时按以下顺序：
 
@@ -236,4 +232,4 @@ Agent 获取框架信息时按以下顺序：
 4. `app.toml`：配置示例。
 5. `readme.md`：项目背景和基础说明。
 
-当文档与源码不一致时，以当前源码行为为准，并考虑同步修正文档。
+当文档与源码不一致时，以当前源码行为为准，并同步修正文档。
