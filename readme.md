@@ -1,127 +1,107 @@
-# thinkgo-framework - 自研go的web框架
+# thinkgo-framework - 自研 Go 服务端框架
+
+ThinkGo 是一个轻量 Go 服务端运行时框架，统一提供配置、生命周期、日志、HTTP/Gin、gRPC、WebSocket、DB/xorm、Redis、锁、缓存、Leader 选举和常用并发工具。
 
 ## 文档
 
-- [`AGENTS.md`](./AGENTS.md)：AI Coding Agent 使用本框架时的入口文档、开发决策规则和能力导航
-- [`USAGE.md`](./USAGE.md)：框架完整能力说明、主要 API、运行时行为和注意事项
+- [`AGENTS.md`](./AGENTS.md)：AI Coding Agent 的首要入口；包含框架能力导航、开发决策规则、约束和文档维护规则
+- [`USAGE.md`](./USAGE.md)：完整能力说明、主要 API、运行时行为、边界和注意事项
+- [`app.toml`](./app.toml)：配置示例
 - `thinkgo/*.go`：框架真实实现；文档与源码不一致时以当前源码为准
 
-使用 Agent 开发基于 ThinkGo 的项目时，建议先阅读 `AGENTS.md`，再按需求查阅 `USAGE.md` 和对应源码。
+Agent 开发基于 ThinkGo 的项目时，阅读顺序建议为：`AGENTS.md` → `USAGE.md` → 对应 `thinkgo/*.go`。
 
-## 部署
+## 安装
 
-添加框架依赖
 ```bash
 go get github.com/kk2land/thinkgo-framework
 ```
-1. 将`app_init.sh`和`hook_pull.sh`复制到项目根目录下.
 
-2. 执行`app_init.sh {module}`脚本，生成项目的目录结构，同时参数`{module}`为空，则表示不需要module层级
+主要包：
 
-3. 如果有module，则修改`hook_pull.sh`，给函数`app_build`传module参数
+```go
+import "github.com/kk2land/thinkgo-framework/thinkgo"
+```
 
-## 使用
+## 部署
 
-### 配置
+1. 将 `app_init.sh` 和 `hook_pull.sh` 复制到项目根目录。
+2. 执行 `app_init.sh {module}` 生成目录结构；`{module}` 为空表示不使用 module 层级。
+3. 使用 module 时，在构建流程中传入 module，并通过 ldflags 注入 `thinkgo.ModuleName`。
 
-- 配置格式参考`app.toml`
-- 支持读取项目根目录下`.env`文件
-  - 如果配置了`_TK_AppStatus`则会额外读取`app/config/app_{_TK_AppStatus}.toml`
-- module的配置文件读取顺序
-  - app/config/app.toml
-  - app/config/app_{_TK_AppStatus}.toml
-  - app/{module}/config/app.toml
-  - app/{module}/config/app_{_TK_AppStatus}.toml
+标准运行目录包含 `app/config`、`app/runtime`、`app/bin`；module 模式对应 `app/{module}/config`、`app/{module}/runtime`、`app/{module}/bin`。
 
-### http服务使用
+## 配置
 
-{package}/handler_http.go
+配置格式参考 `app.toml`。框架支持项目根目录 `.env`、`_TK_AppStatus` 环境配置覆盖和 module 配置叠加。
+
+module 模式配置加载顺序：
+
+1. `app/config/app.toml`
+2. `app/config/app_{_TK_AppStatus}.toml`
+3. `app/{module}/config/app.toml`
+4. `app/{module}/config/app_{_TK_AppStatus}.toml`
+
+完整环境变量、模板宏和配置行为见 [`USAGE.md`](./USAGE.md)。
+
+## HTTP 示例
+
+`handler_http.go`：
+
 ```go
 var _ = thinkgo.HttpRouter().GET("/", func(c *gin.Context) {
     c.JSON(200, gin.H{
         "code": 0,
         "msg":  "succ",
-        "data": map[string]interface{} {
-        },
+        "data": map[string]interface{}{},
     })
 })
 ```
 
-main.go
+入口中导入业务路由包后，通过 ThinkGo HTTP 启动能力运行服务。具体启动、错误处理、gRPC 共端口等能力见 `USAGE.md`。
+
+## WebSocket
+
+框架提供 `NewHttpWsRouter[T]`、`HttpWsConn[T]`、`HttpWsConnGroup[T]` 等泛型 WebSocket 路由与连接管理能力，包括消息编解码、写队列、ping/pong、连接绑定和分组广播。
+
+不要以旧版非泛型示例作为 API 依据；以 [`USAGE.md`](./USAGE.md) 和当前 `thinkgo/http_ws.go` 为准。
+
+## Redis
+
+通过 `thinkgo.RedisDefault()` / `thinkgo.Redis(name)` 获取框架管理的 `RedisClient`。框架负责实例、配置、key prefix、重试和生命周期；详细用法见 `USAGE.md`。
+
+## 数据库
+
+数据库基于 xorm。通常通过：
+
 ```go
-import _ "{package}"
+db := thinkgo.DBDefaultOrPanic()
 ```
 
-### websocket服务使用
+获取默认实例后按 xorm 语义查询。例如：
 
-{package}/handler_ws.go
 ```go
-
-var wsRouter = thinkgo.NewHttpWsRouter(
-	10, //写入队列长度
-	func(msg interface{}) ([]byte, error) { //消息序列化
-		return json.Marshal(msg)
-	},
-	func(b []byte) (interface{}, error) { //消息反序列化
-		var msg *wsMessage
-		if err := json.Unmarshal(b, &msg); err != nil {
-			return nil, err
-		}
-		return msg, nil
-	},
-)
-
-var _ = thinkgo.HttpRouter().GET("/ws", func(c *gin.Context) {
-    conn, err := wsRouter.Create(c)
-    if err != nil {
-        return
-    }
-    conn.OnMessage(func(wsConn *thinkgo.HttpWsConn, msg interface{}) error {
-		//do something
-        return nil
-    })
-    _ = conn.Start()
-})
-
-```
-
-### redis使用
-
-todo
-
-### 数据库使用
-
-数据库直接使用的[xorm](https://xorm.io/zh/docs/)，举个例子：
-```go
-
-// 默认的表名、字段名使用驼峰转成小写下划线分隔的方案
-
 type MyStudent struct {
-    Id         int64 `xorm:"pk autoincr"` //指定自增主键
+    Id         int64 `xorm:"pk autoincr"`
     Name       string
-    CreateTime int64 `xorm:"ct"` //指定字段名
+    CreateTime int64 `xorm:"ct"`
 }
 
 func (m *MyStudent) TableName() string {
-	// 指定表名
-	return "student"
+    return "student"
 }
 
-db := thinkgo.DBDefaultOrPanic() //获取default配置的数据库对象
-
-// 插入
-studentA := &MyStudent{
-	Name: "A",
-    CreateTime: time.Now().Unix()
+student := &MyStudent{
+    Name:       "A",
+    CreateTime: time.Now().Unix(),
 }
-affected, err := db.Insert(studentA)
+affected, err := db.Insert(student)
 
-// 读取多条
 students := make([]*MyStudent, 0)
-err := db.Find(&students)
+err = db.Find(&students)
 
-//读取单条
-student := new(MyStudent)
-has, err := db.Where("id = ?", 1).Get(student)
-
+one := new(MyStudent)
+has, err := db.Where("id = ?", 1).Get(one)
 ```
+
+ThinkGo 主要负责 xorm 实例装配、连接池、日志和重试判断，不替代 xorm 本身。
