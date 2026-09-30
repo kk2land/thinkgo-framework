@@ -35,7 +35,7 @@
 主要包：
 
 ```go
-import "git.hy545.cc/crypto/thinkgo-framework/thinkgo"
+import "github.com/kk2land/thinkgo-framework/thinkgo"
 ```
 
 它主要负责基础设施的统一装配和公共能力复用。
@@ -135,7 +135,7 @@ app/{module}/
 
 处理使用 ThinkGo 的业务项目时，按以下顺序工作：
 
-1. 确认业务项目是否依赖 `git.hy545.cc/crypto/thinkgo-framework`。
+1. 确认业务项目是否依赖 `github.com/kk2land/thinkgo-framework`。
 2. 检查项目的 `app/config/*.toml`、`.env`、启动入口和构建脚本。
 3. 阅读本文件和 `USAGE.md` 中与需求对应的章节。
 4. 搜索 `thinkgo/` 中已有类型和函数，确认真实 API 和行为。
