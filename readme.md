@@ -1,5 +1,13 @@
 # thinkgo-framework - 自研go的web框架
 
+## 文档
+
+- [`AGENTS.md`](./AGENTS.md)：AI Coding Agent 使用本框架时的入口文档、开发决策规则和能力导航
+- [`USAGE.md`](./USAGE.md)：框架完整能力说明、主要 API、运行时行为和注意事项
+- `thinkgo/*.go`：框架真实实现；文档与源码不一致时以当前源码为准
+
+使用 Agent 开发基于 ThinkGo 的项目时，建议先阅读 `AGENTS.md`，再按需求查阅 `USAGE.md` 和对应源码。
+
 ## 部署
 
 添加框架依赖
@@ -22,8 +30,8 @@ go get github.com/kk2land/thinkgo-framework
 - module的配置文件读取顺序
   - app/config/app.toml
   - app/config/app_{_TK_AppStatus}.toml
-  - app/config/{module}/config/app.toml
-  - app/config/{module}/config/app_{_TK_AppStatus}.toml
+  - app/{module}/config/app.toml
+  - app/{module}/config/app_{_TK_AppStatus}.toml
 
 ### http服务使用
 
