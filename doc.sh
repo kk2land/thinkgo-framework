@@ -9,5 +9,5 @@ if [ ! -f "$godoc_bin" ];then
     GOFLAGS="" go install golang.org/x/tools/cmd/godoc@latest
 fi
 
-echo "http://127.0.0.1:6060/pkg/git.hy545.cc/crypto/thinkgo-framework/thinkgo"
+echo "http://127.0.0.1:6060/pkg/github.com/kk2land/thinkgo-framework/thinkgo"
 $godoc_bin -http=:6060

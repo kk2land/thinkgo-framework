@@ -7,7 +7,7 @@ function app_build() {
     module="$1"
     src_dir="src"
 
-    tk_module="git.hy545.cc/crypto/thinkgo-framework"
+    tk_module="github.com/kk2land/thinkgo-framework"
     if [ -z "$module" ];then
         ldflags=""
         main_arr=$(ls $src_dir/main/*.go)
